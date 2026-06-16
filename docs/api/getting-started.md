@@ -9,12 +9,12 @@ title: Getting Started
 ## 前提条件
 
 - Misora Connect のアカウント
-- API キー（カスタマーコード紐付き済み）
+- API キー
 - HTTP クライアント（curl、Postman、各言語の HTTP ライブラリなど）
 
 ## ステップ 1: API キーを確認する
 
-Misora Connect API へのアクセスには API キーが必要です。API キーはカスタマーコード（9桁の数字）に紐づいており、そのカスタマーコードに属するリソースのみにアクセスできます。
+Misora Connect API へのアクセスには API キーが必要です。
 
 API キーの発行・確認については、Misora Connect の管理者にお問い合わせください。
 
@@ -26,7 +26,7 @@ API キーを取得したら、SIM 一覧の取得を試してみましょう。
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims?customer_code=110139801"
+  "https://api.misora-connect.com/v1/sims"
 ```
 
 ### Python の場合
@@ -35,12 +35,10 @@ curl -H "x-api-key: YOUR_API_KEY" \
 import requests
 
 headers = {"x-api-key": "YOUR_API_KEY"}
-params = {"customer_code": "110139801"}
 
 response = requests.get(
     "https://api.misora-connect.com/v1/sims",
     headers=headers,
-    params=params,
 )
 print(response.json())
 ```
@@ -51,7 +49,6 @@ print(response.json())
 [
   {
     "sim_id": "sim-001",
-    "customer_code": "110139801",
     "iccid": "8981100000000000001",
     "msisdn": "09012345678",
     "status": "active",
@@ -65,11 +62,11 @@ print(response.json())
 
 ## ステップ 3: SIM のサマリーを確認する
 
-カスタマーコードに属する SIM 全体のステータス別集計を取得できます。
+SIM 全体のステータス別集計を取得できます。
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims/summary?customer_code=110139801"
+  "https://api.misora-connect.com/v1/sims/summary"
 ```
 
 ```json
@@ -87,7 +84,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/stats/sims/sim-001/monthly_usage?customer_code=110139801"
+  "https://api.misora-connect.com/v1/stats/sims/sim-001/monthly_usage"
 ```
 
 ```json
@@ -104,20 +101,15 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ## 認証の仕組み
 
-### API キーとカスタマーコード
+### API キー
 
-API キーにはカスタマーコードが紐づいています。リクエスト時に指定する `customer_code` パラメータと、API キーに紐づくカスタマーコードが一致する必要があります。
+API へのアクセスにはリクエストヘッダーに `x-api-key` を含める必要があります。
 
 ```
-x-api-key: YOUR_API_KEY          ← カスタマーコード 110139801 に紐付き
-?customer_code=110139801          ← 一致していること
+x-api-key: YOUR_API_KEY
 ```
 
-不一致の場合、`403 Forbidden` が返ります。
-
-### ワイルドカードキー
-
-管理用のワイルドカードキーは任意のカスタマーコードを指定できますが、`customer_code` パラメータの指定が必須です。
+API キーが不正または未指定の場合、`403 Forbidden` が返ります。
 
 ## レート制限
 
@@ -136,7 +128,7 @@ API はエラー時に適切な HTTP ステータスコードと JSON レスポ�
 
 ```json
 {
-  "detail": "customer_code is required"
+  "detail": "Resource not found"
 }
 ```
 
