@@ -28,4 +28,5 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           use_bedrock: "true"
-          model: ap-northeast-1.anthropic.claude-opus-4-6-20260610-v1:0
+          claude_args: |
+            --model ap-northeast-1.anthropic.claude-opus-4-6-20260610-v1:0
