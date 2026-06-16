@@ -1,0 +1,150 @@
+# Getting Started
+
+このガイドでは、Misora Connect API を使い始めるための手順を説明します。
+
+## 前提条件
+
+- Misora Connect のアカウント
+- API キー（カスタマーコード紐付き済み）
+- HTTP クライアント（curl、Postman、各言語の HTTP ライブラリなど）
+
+## ステップ 1: API キーを確認する
+
+Misora Connect API へのアクセスには API キーが必要です。API キーはカスタマーコード（9桁の数字）に紐づいており、そのカスタマーコードに属するリソースのみにアクセスできます。
+
+API キーの発行・確認については、Misora Connect の管理者にお問い合わせください。
+
+## ステップ 2: 最初のリクエストを送信する
+
+API キーを取得したら、SIM 一覧の取得を試してみましょう。
+
+### curl の場合
+
+```bash
+curl -H "x-api-key: YOUR_API_KEY" \
+  "https://api.misora-connect.com/v1/sims?customer_code=110139801"
+```
+
+### Python の場合
+
+```python
+import requests
+
+headers = {"x-api-key": "YOUR_API_KEY"}
+params = {"customer_code": "110139801"}
+
+response = requests.get(
+    "https://api.misora-connect.com/v1/sims",
+    headers=headers,
+    params=params,
+)
+print(response.json())
+```
+
+### レスポンス例
+
+```json
+[
+  {
+    "sim_id": "sim-001",
+    "customer_code": "110139801",
+    "iccid": "8981100000000000001",
+    "msisdn": "09012345678",
+    "status": "active",
+    "session_status": "online",
+    "apn": "misora.io",
+    "active_plan_name": "plan-s",
+    "ip_address": "10.0.0.1"
+  }
+]
+```
+
+## ステップ 3: SIM のサマリーを確認する
+
+カスタマーコードに属する SIM 全体のステータス別集計を取得できます。
+
+```bash
+curl -H "x-api-key: YOUR_API_KEY" \
+  "https://api.misora-connect.com/v1/sims/summary?customer_code=110139801"
+```
+
+```json
+{
+  "total": 150,
+  "active": 120,
+  "suspended": 25,
+  "terminated": 5
+}
+```
+
+## ステップ 4: 通信量を確認する
+
+特定の SIM の月別通信量を取得してみましょう。
+
+```bash
+curl -H "x-api-key: YOUR_API_KEY" \
+  "https://api.misora-connect.com/v1/stats/sims/sim-001/monthly_usage?customer_code=110139801"
+```
+
+```json
+[
+  {
+    "year_month": "202606",
+    "downlink_bytes": 1073741824,
+    "uplink_bytes": 268435456,
+    "plan_name": "plan-s",
+    "last_updated_at": "2026-06-16T00:00:00Z"
+  }
+]
+```
+
+## 認証の仕組み
+
+### API キーとカスタマーコード
+
+API キーにはカスタマーコードが紐づいています。リクエスト時に指定する `customer_code` パラメータと、API キーに紐づくカスタマーコードが一致する必要があります。
+
+```
+x-api-key: YOUR_API_KEY          ← カスタマーコード 110139801 に紐付き
+?customer_code=110139801          ← 一致していること
+```
+
+不一致の場合、`403 Forbidden` が返ります。
+
+### ワイルドカードキー
+
+管理用のワイルドカードキーは任意のカスタマーコードを指定できますが、`customer_code` パラメータの指定が必須です。
+
+## レート制限
+
+API にはレート制限が設定されています。
+
+| 項目 | 値 |
+|---|---|
+| スロットル | 1 リクエスト/秒（バースト: 1） |
+| 日次クォータ | 1,500 リクエスト/日 |
+
+制限を超えた場合は `429 Too Many Requests` が返ります。
+
+## エラーハンドリング
+
+API はエラー時に適切な HTTP ステータスコードと JSON レスポンスを返します。
+
+```json
+{
+  "detail": "customer_code is required"
+}
+```
+
+| ステータスコード | 説明 |
+|---|---|
+| `400` | リクエストパラメータの不正 |
+| `403` | 認証失敗・アクセス権限なし |
+| `404` | リソースが見つからない |
+| `429` | レート制限超過 |
+| `500` | サーバー内部エラー |
+
+## 次のステップ
+
+- [User Guide](user-guide.md) で各機能の詳しい使い方を学ぶ
+- [API Reference](reference.md) で全エンドポイントの仕様を確認する
