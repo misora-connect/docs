@@ -1,3 +1,7 @@
+---
+title: Getting Started
+---
+
 # Getting Started
 
 このガイドでは、Misora Connect API を使い始めるための手順を説明します。

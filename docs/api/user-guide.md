@@ -1,3 +1,7 @@
+---
+title: User Guide
+---
+
 # User Guide
 
 このガイドでは、Misora Connect API の各機能を実践的なユースケースとともに説明します。

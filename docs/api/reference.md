@@ -1,3 +1,7 @@
+---
+title: API Reference
+---
+
 # API Reference
 
 すべてのエンドポイントは認証が必要です。リクエストヘッダーに `x-api-key` を含めてください。
