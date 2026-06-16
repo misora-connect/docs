@@ -21,9 +21,10 @@ jobs:
           fetch-depth: 0
       - uses: anthropics/claude-code-action@v1
         with:
-          use_bedrock: "true"
-          claude_args: |
-            --model ap-northeast-1.anthropic.claude-opus-4-6-20260610-v1:0
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
         env:
+          CLAUDE_CODE_USE_BEDROCK: "1"
+          ANTHROPIC_BEDROCK_BASE_URL: https://bedrock-runtime.ap-northeast-1.amazonaws.com
+          ANTHROPIC_MODEL: ap-northeast-1.anthropic.claude-opus-4-6-20260610-v1:0
           AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.ANTHROPIC_API_KEY }}
           AWS_REGION: ap-northeast-1
