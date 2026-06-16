@@ -15,11 +15,15 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          use_bedrock: "true"
+          claude_args: |
+            --model ap-northeast-1.anthropic.claude-sonnet-4-20250514-v1:0
+        env:
+          AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.ANTHROPIC_API_KEY }}
+          AWS_REGION: ap-northeast-1
