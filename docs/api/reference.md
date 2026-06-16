@@ -33,6 +33,7 @@ SIM の一覧を取得します。
 [
   {
     "sim_id": "sim-001",
+    "customer_code": "110139801",
     "iccid": "8981100000000000001",
     "imsi": "440101234567890",
     "msisdn": "09012345678",
@@ -57,6 +58,7 @@ SIM の一覧を取得します。
 | フィールド | 型 | 説明 |
 |---|---|---|
 | `sim_id` | string | SIM の一意識別子 |
+| `customer_code` | string | カスタマーコード |
 | `iccid` | string | IC カード識別番号 |
 | `imsi` | string | 国際移動体加入者識別番号 |
 | `msisdn` | string | 電話番号 |
@@ -185,6 +187,7 @@ SIM のステータス別サマリーを取得します。
 [
   {
     "sim_id": "sim-001",
+    "customer_code": "110139801",
     "imsi": "440101234567890",
     "imei": "353456789012345",
     "APN": "misora.io",
@@ -207,6 +210,7 @@ SIM のステータス別サマリーを取得します。
 | フィールド | 型 | 説明 |
 |---|---|---|
 | `sim_id` | string | SIM ID |
+| `customer_code` | string | カスタマーコード |
 | `imsi` | string | IMSI |
 | `imei` | string | IMEI |
 | `APN` | string | Access Point Name |
@@ -236,6 +240,7 @@ SIM のステータス別サマリーを取得します。
 ```json
 [
   {
+    "customer_code": "110139801",
     "sim_id": "sim-001",
     "msisdn": "09012345678",
     "downlink_bytes": 10737418240,
