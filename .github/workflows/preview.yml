@@ -27,7 +27,7 @@ jobs:
 
       - name: Override baseurl for preview
         run: |
-          echo 'baseurl: ""' > ./docs/_config.yml
+          echo 'baseurl: ""' >> ./docs/_config.yml
 
       - uses: actions/jekyll-build-pages@v1
         with:
