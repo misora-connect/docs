@@ -10,19 +10,18 @@ permissions:
   id-token: write
 
 concurrency:
-  group: preview-${{ github.event.pull_request.number }}
+  group: preview-${{ github.event.number }}
   cancel-in-progress: true
-
-env:
-  PREVIEW_BUCKET: misora-docs-preview
-  PREVIEW_PREFIX: docs-pr-${{ github.event.pull_request.number }}
-  PREVIEW_URL: https://docs-pr-${{ github.event.pull_request.number }}.dev.misora-connect.com
-  CF_DISTRIBUTION_ID: E1Q5BADE38XP60
 
 jobs:
   deploy:
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
+    env:
+      PREVIEW_BUCKET: misora-docs-preview
+      PREVIEW_PREFIX: docs-pr-${{ github.event.number }}
+      PREVIEW_URL: https://docs-pr-${{ github.event.number }}.dev.misora-connect.com
+      CF_DISTRIBUTION_ID: E1Q5BADE38XP60
     steps:
       - uses: actions/checkout@v4
 
@@ -82,6 +81,9 @@ jobs:
   cleanup:
     if: github.event.action == 'closed'
     runs-on: ubuntu-latest
+    env:
+      PREVIEW_BUCKET: misora-docs-preview
+      PREVIEW_PREFIX: docs-pr-${{ github.event.number }}
     steps:
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
