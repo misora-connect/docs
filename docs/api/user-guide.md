@@ -14,7 +14,7 @@ title: User Guide
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims?customer_code=110139801"
+  "https://api.misora-connect.com/v1/sims"
 ```
 
 #### ページネーション
@@ -24,11 +24,11 @@ curl -H "x-api-key: YOUR_API_KEY" \
 ```bash
 # 最初の 50 件
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims?customer_code=110139801&limit=50&offset=0"
+  "https://api.misora-connect.com/v1/sims?limit=50&offset=0"
 
 # 次の 50 件
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims?customer_code=110139801&limit=50&offset=50"
+  "https://api.misora-connect.com/v1/sims?limit=50&offset=50"
 ```
 
 - `limit`: 1回のレスポンスで返す最大件数（デフォルト: 100、最大: 1,000）
@@ -41,10 +41,10 @@ curl -H "x-api-key: YOUR_API_KEY" \
 ```bash
 # 更新日時の新しい順
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims?customer_code=110139801&order_by=updated_at&order_direction=desc"
+  "https://api.misora-connect.com/v1/sims?order_by=updated_at&order_direction=desc"
 ```
 
-**ソート可能なフィールド**: `sim_id`、`customer_code`、`status`、`created_at`、`updated_at`
+**ソート可能なフィールド**: `sim_id`、`status`、`created_at`、`updated_at`
 
 #### 解約済み SIM の表示
 
@@ -52,7 +52,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims?customer_code=110139801&include_terminated=true"
+  "https://api.misora-connect.com/v1/sims?include_terminated=true"
 ```
 
 #### null フィールドの除外
@@ -61,7 +61,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims?customer_code=110139801&filter_nulls=false"
+  "https://api.misora-connect.com/v1/sims?filter_nulls=false"
 ```
 
 ### 個別 SIM の取得
@@ -70,7 +70,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims/sim-001?customer_code=110139801"
+  "https://api.misora-connect.com/v1/sims/sim-001"
 ```
 
 ### SIM サマリーの取得
@@ -79,7 +79,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims/summary?customer_code=110139801"
+  "https://api.misora-connect.com/v1/sims/summary"
 ```
 
 ---
@@ -94,14 +94,14 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/stats/sims/monthly_usage?customer_code=110139801"
+  "https://api.misora-connect.com/v1/stats/sims/monthly_usage"
 ```
 
 #### 個別 SIM の月別通信量
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/stats/sims/sim-001/monthly_usage?customer_code=110139801"
+  "https://api.misora-connect.com/v1/stats/sims/sim-001/monthly_usage"
 ```
 
 レスポンスには `downlink_bytes`（下り）と `uplink_bytes`（上り）がバイト単位で含まれます。
@@ -112,7 +112,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/stats/sims/sim-001/details?customer_code=110139801"
+  "https://api.misora-connect.com/v1/stats/sims/sim-001/details"
 ```
 
 レスポンスには接続情報（IMSI、IMEI、APN、IP アドレス）とパケット数も含まれます。
@@ -123,14 +123,14 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/stats/sims/sim-001/cumulative_usage?customer_code=110139801"
+  "https://api.misora-connect.com/v1/stats/sims/sim-001/cumulative_usage"
 ```
 
 #### 全 SIM の累積通信量
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/stats/sims/cumulative_usage?customer_code=110139801"
+  "https://api.misora-connect.com/v1/stats/sims/cumulative_usage"
 ```
 
 **注意**: レコード数が 30,000 件を超える場合、レスポンスは `302` リダイレクトとなり、S3 の署名付き URL（gzip 圧縮 NDJSON、有効期限 5 分）へ転送されます。HTTP クライアントがリダイレクトに自動追従する設定になっているか確認してください。
@@ -145,7 +145,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/exports?customer_code=110139801"
+  "https://api.misora-connect.com/v1/exports"
 ```
 
 ```json
@@ -164,7 +164,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -X POST -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/exports/sims?customer_code=110139801&format=csv"
+  "https://api.misora-connect.com/v1/exports/sims?format=csv"
 ```
 
 ```json
@@ -186,7 +186,7 @@ curl -X POST -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -X POST -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/exports/sims?customer_code=110139801&format=csv&async=false"
+  "https://api.misora-connect.com/v1/exports/sims?format=csv&async=false"
 ```
 
 ```json
@@ -218,7 +218,7 @@ curl -X POST -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/recharges/sims?customer_code=110139801"
+  "https://api.misora-connect.com/v1/recharges/sims"
 ```
 
 ```json
@@ -249,21 +249,21 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/recharges/sims/8981100000000000001/plans?customer_code=110139801"
+  "https://api.misora-connect.com/v1/recharges/sims/8981100000000000001/plans"
 ```
 
 #### 全プランの一覧
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/recharges/plans?customer_code=110139801"
+  "https://api.misora-connect.com/v1/recharges/plans"
 ```
 
 #### 特定プランの詳細
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/recharges/plans/PLAN-001?customer_code=110139801"
+  "https://api.misora-connect.com/v1/recharges/plans/PLAN-001"
 ```
 
 ```json
@@ -288,7 +288,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 curl -X POST -H "x-api-key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"iccid": "8981100000000000001", "plan_code": "PLAN-001"}' \
-  "https://api.misora-connect.com/v1/recharges/reservations?customer_code=110139801"
+  "https://api.misora-connect.com/v1/recharges/reservations"
 ```
 
 ```json
@@ -303,7 +303,7 @@ curl -X POST -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/recharges/reservations?customer_code=110139801"
+  "https://api.misora-connect.com/v1/recharges/reservations"
 ```
 
 フィルタリングオプション:
@@ -313,18 +313,12 @@ curl -H "x-api-key: YOUR_API_KEY" \
 ```bash
 # 特定 SIM の実行済み予約のみ
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/recharges/reservations?customer_code=110139801&iccid=8981100000000000001&status=executed"
+  "https://api.misora-connect.com/v1/recharges/reservations?iccid=8981100000000000001&status=executed"
 ```
 
 ---
 
 ## 共通仕様
-
-### customer_code パラメータ
-
-すべてのエンドポイントで `customer_code`（9桁の数字）が必要です。クエリパラメータとして指定します。
-
-レガシー互換として `customer_id` も受け付けますが、新規実装では `customer_code` を使用してください。
 
 ### バイト単位の通信量
 
