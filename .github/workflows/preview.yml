@@ -16,13 +16,16 @@ concurrency:
 jobs:
   deploy:
     if: github.event.action != 'closed'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, colima]
     env:
       PREVIEW_BUCKET: misora-docs-preview
       PREVIEW_PREFIX: docs-pr-${{ github.event.number }}
       PREVIEW_URL: https://docs-pr-${{ github.event.number }}.dev.misora-connect.com
       CF_DISTRIBUTION_ID: E1Q5BADE38XP60
     steps:
+      - name: Clean up Docker-generated files
+        run: sudo rm -rf _site
+
       - uses: actions/checkout@v4
 
       - name: Override baseurl for preview
@@ -80,7 +83,7 @@ jobs:
 
   cleanup:
     if: github.event.action == 'closed'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, colima]
     env:
       PREVIEW_BUCKET: misora-docs-preview
       PREVIEW_PREFIX: docs-pr-${{ github.event.number }}

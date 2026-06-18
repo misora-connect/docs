@@ -15,8 +15,11 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, colima]
     steps:
+      - name: Clean up Docker-generated files
+        run: sudo rm -rf _site
+
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
         with:
@@ -29,7 +32,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, colima]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
