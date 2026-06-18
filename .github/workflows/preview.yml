@@ -23,6 +23,9 @@ jobs:
       PREVIEW_URL: https://docs-pr-${{ github.event.number }}.dev.misora-connect.com
       CF_DISTRIBUTION_ID: E1Q5BADE38XP60
     steps:
+      - name: Clean up Docker-generated files
+        run: sudo rm -rf _site
+
       - uses: actions/checkout@v4
 
       - name: Override baseurl for preview
