@@ -10,7 +10,7 @@ jobs:
   claude:
     if: |
       contains(github.event.comment.body || github.event.issue.body, '@claude')
-    runs-on: [self-hosted, arm64]
+    runs-on: [self-hosted, colima]
     permissions:
       contents: write
       pull-requests: write
