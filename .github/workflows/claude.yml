@@ -37,22 +37,40 @@ jobs:
 
       - name: Open PR for the created branch
         if: github.event_name == 'issues' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null)
+        uses: actions/github-script@v7
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: ${{ steps.claude.outputs.branch_name }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-        run: |
-          if [ -z "$BRANCH" ]; then
-            echo "No branch created by Claude; skipping PR creation."
-            exit 0
-          fi
-          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')" ]; then
-            echo "PR already open for $BRANCH; skipping."
-            exit 0
-          fi
-          TITLE=$(gh issue view "$ISSUE_NUMBER" --json title --jq .title)
-          gh pr create \
-            --head "$BRANCH" \
-            --base main \
-            --title "$TITLE" \
-            --body "Closes #$ISSUE_NUMBER"
+        with:
+          script: |
+            const branch = process.env.BRANCH;
+            const issueNumber = Number(process.env.ISSUE_NUMBER);
+            if (!branch) {
+              core.info('No branch created by Claude; skipping PR creation.');
+              return;
+            }
+            const { owner, repo } = context.repo;
+            const { data: existing } = await github.rest.pulls.list({
+              owner,
+              repo,
+              head: `${owner}:${branch}`,
+              state: 'open',
+            });
+            if (existing.length > 0) {
+              core.info(`PR already open for ${branch}; skipping.`);
+              return;
+            }
+            const { data: issue } = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: issueNumber,
+            });
+            const { data: pr } = await github.rest.pulls.create({
+              owner,
+              repo,
+              head: branch,
+              base: 'main',
+              title: issue.title,
+              body: `Closes #${issueNumber}`,
+            });
+            core.info(`Created PR #${pr.number}: ${pr.html_url}`);
