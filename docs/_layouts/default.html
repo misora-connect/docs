@@ -8,10 +8,98 @@
 {% seo %}
     <link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
     {% include head-custom.html %}
+    <style>
+      .docs-layout {
+        display: flex;
+        gap: 2rem;
+      }
+      .docs-sidebar {
+        width: 220px;
+        flex-shrink: 0;
+        position: sticky;
+        top: 2rem;
+        align-self: flex-start;
+        max-height: calc(100vh - 4rem);
+        overflow-y: auto;
+      }
+      .docs-sidebar nav {
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .docs-sidebar ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .docs-sidebar li {
+        margin: 0;
+      }
+      .docs-sidebar a {
+        display: block;
+        padding: 4px 12px;
+        color: #24292f;
+        text-decoration: none;
+        border-radius: 6px;
+      }
+      .docs-sidebar a:hover {
+        background-color: #f6f8fa;
+        text-decoration: none;
+      }
+      .docs-sidebar a.active {
+        background-color: #ddf4ff;
+        font-weight: 600;
+      }
+      .docs-sidebar .nav-section-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #57606a;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 8px 12px 4px;
+        margin-top: 12px;
+      }
+      .docs-sidebar .nav-section-title:first-child {
+        margin-top: 0;
+      }
+      .docs-content {
+        flex: 1;
+        min-width: 0;
+      }
+      @media (max-width: 768px) {
+        .docs-layout {
+          flex-direction: column;
+        }
+        .docs-sidebar {
+          width: 100%;
+          position: static;
+          max-height: none;
+          border-bottom: 1px solid #d0d7de;
+          padding-bottom: 1rem;
+          margin-bottom: 1rem;
+        }
+      }
+    </style>
   </head>
   <body>
     <div class="container-lg px-3 my-5 markdown-body">
-      {{ content }}
+      <div class="docs-layout">
+        <aside class="docs-sidebar">
+          <nav>
+            <ul>
+              <li class="nav-section-title">General</li>
+              <li><a href="{{ '/' | relative_url }}" {% if page.url == '/index.html' or page.url == '/' %}class="active"{% endif %}>Home</a></li>
+              <li class="nav-section-title">API</li>
+              <li><a href="{{ '/api/' | relative_url }}" {% if page.url == '/api/index.html' or page.url == '/api/' %}class="active"{% endif %}>概要</a></li>
+              <li><a href="{{ '/api/getting-started.html' | relative_url }}" {% if page.url == '/api/getting-started.html' %}class="active"{% endif %}>Getting Started</a></li>
+              <li><a href="{{ '/api/user-guide.html' | relative_url }}" {% if page.url == '/api/user-guide.html' %}class="active"{% endif %}>User Guide</a></li>
+              <li><a href="{{ '/api/reference.html' | relative_url }}" {% if page.url == '/api/reference.html' %}class="active"{% endif %}>API Reference</a></li>
+            </ul>
+          </nav>
+        </aside>
+        <div class="docs-content">
+          {{ content }}
+        </div>
+      </div>
 
       {% if site.github.private != true and site.github.license %}
       <div class="footer border-top border-gray-light mt-5 pt-3 text-right text-gray">
