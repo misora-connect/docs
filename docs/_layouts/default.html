@@ -511,8 +511,47 @@
         border-bottom: 0;
       }
 
+      /* Primer の tr:nth-child(2n) を打ち消してテーブルセルに任せる */
+      .markdown-body table tr,
+      .markdown-body table tr:nth-child(2n) {
+        background: transparent;
+      }
+
       .markdown-body table tr:nth-child(even) td {
         background: var(--mc-color-background-alt);
+      }
+
+      /* Rouge/Primer のシンタックスハイライト色をダークで再定義 */
+      :root[data-theme="dark"] .markdown-body pre code,
+      :root[data-theme="dark"] .markdown-body pre code * {
+        color: var(--mc-color-text-primary);
+      }
+      :root[data-theme="dark"] .markdown-body .pl-s,
+      :root[data-theme="dark"] .markdown-body .pl-pds,
+      :root[data-theme="dark"] .markdown-body .pl-s .pl-s1 { color: #9ECBFF; }
+      :root[data-theme="dark"] .markdown-body .pl-c { color: #7F8C98; font-style: italic; }
+      :root[data-theme="dark"] .markdown-body .pl-k { color: #F97583; }
+      :root[data-theme="dark"] .markdown-body .pl-c1,
+      :root[data-theme="dark"] .markdown-body .pl-e,
+      :root[data-theme="dark"] .markdown-body .pl-en { color: #B392F0; }
+      :root[data-theme="dark"] .markdown-body .pl-smi { color: #E1E4E8; }
+      :root[data-theme="dark"] .markdown-body .pl-ent { color: #85E89D; }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) .markdown-body pre code,
+        :root:not([data-theme="light"]) .markdown-body pre code * {
+          color: var(--mc-color-text-primary);
+        }
+        :root:not([data-theme="light"]) .markdown-body .pl-s,
+        :root:not([data-theme="light"]) .markdown-body .pl-pds,
+        :root:not([data-theme="light"]) .markdown-body .pl-s .pl-s1 { color: #9ECBFF; }
+        :root:not([data-theme="light"]) .markdown-body .pl-c { color: #7F8C98; font-style: italic; }
+        :root:not([data-theme="light"]) .markdown-body .pl-k { color: #F97583; }
+        :root:not([data-theme="light"]) .markdown-body .pl-c1,
+        :root:not([data-theme="light"]) .markdown-body .pl-e,
+        :root:not([data-theme="light"]) .markdown-body .pl-en { color: #B392F0; }
+        :root:not([data-theme="light"]) .markdown-body .pl-smi { color: #E1E4E8; }
+        :root:not([data-theme="light"]) .markdown-body .pl-ent { color: #85E89D; }
       }
 
       /* 引用 */
