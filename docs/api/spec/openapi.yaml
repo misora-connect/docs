@@ -197,7 +197,7 @@ paths:
       tags: [Statistics]
       summary: 全 SIM 累積通信量
       description: |
-        顧客の全 SIM の累積通信量を一括取得します。日次で更新されます。
+        顧客の全 SIM の累積通信量を一括取得します。概ねリアルタイムで更新されます（最大 5 分のラグがあります）。
 
         30,000 件以下の場合は JSON 配列を直接返却します。
         30,000 件を超える場合は S3 にエクスポートし、署名付きダウンロード URL へ 302 リダイレクトします（gzip 圧縮 NDJSON、5分有効）。
@@ -352,7 +352,7 @@ paths:
     get:
       tags: [Statistics]
       summary: SIM CDR（通信明細）
-      description: 特定 SIM の通信明細（CDR）を取得します。直近 288 件（約12日分）のレコードが返却されます。
+      description: 特定 SIM の通信明細（CDR）を取得します。直近 288 件（約24時間分）のレコードが返却されます。
       operationId: getSimDetails
       parameters:
         - name: sim_id
@@ -387,7 +387,7 @@ paths:
     get:
       tags: [Statistics]
       summary: 累積通信量
-      description: 特定 SIM の累積通信量を取得します。日次で更新されます。
+      description: 特定 SIM の累積通信量を取得します。概ねリアルタイムで更新されます（最大 5 分のラグがあります）。
       operationId: getSimCumulativeUsage
       parameters:
         - name: sim_id
