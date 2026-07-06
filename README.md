@@ -1,12 +1,12 @@
 # docs
 
-misora-connect のユーザー・開発者向けドキュメントリポジトリ。
+misora-connect のユーザーおよび開発者向けドキュメントを管理するリポジトリです。
 
 ## 本番サイト
 
 <https://misora-connect.github.io/docs/>
 
-`main` ブランチに push すると GitHub Pages へ自動デプロイされる。
+`main` ブランチへ push すると GitHub Pages へ自動デプロイされます。
 
 ## リポジトリ構成
 
@@ -29,23 +29,23 @@ LICENSE                Apache License 2.0
 
 ## `@claude` ワークフロー
 
-Issue や PR コメントに `@claude` を含めると、AI (Claude Code) が自動で対応する。
+Issue や PR のコメントに `@claude` を含めると、Claude Code が自動で対応します。
 
 ### 仕組み
 
-1. Issue / コメントに `@claude` を記載して投稿する
-2. GitHub Actions が起動し、Claude Code がリクエストを分析する
-3. 必要に応じてコード変更を行い、ブランチを作成する
-4. 変更がある場合は自動で PR が作成される (Issue にリンク)
+1. Issue またはコメントに `@claude` を記載して投稿します。
+2. GitHub Actions が起動し、Claude Code がリクエストを分析します。
+3. 必要に応じてコードを変更し、作業ブランチを作成します。
+4. 変更がある場合、Issue にリンクする形で PR が自動作成されます。
 
 ### 使い方の例
 
-- Issue 本文に `@claude` を書いて新規作成 → Issue の内容に応じて対応
-- PR のコメントで `@claude ここをレビューして` → コードレビューを実施
-- Issue コメントで `@claude この修正をして` → 修正を実施して PR を作成
+- Issue 本文に `@claude` を書いて新規作成すると、内容に応じて対応します。
+- PR コメントで `@claude ここをレビューして` と書くと、コードレビューを実施します。
+- Issue コメントで `@claude この修正をして` と書くと、修正を実施して PR を作成します。
 
 ### 注意事項
 
-- Claude はコメント内の指示に従って動作する。指示は具体的に書くとよい
-- 対応結果は GitHub コメントで報告される
-- 作成された PR は人間がレビュー・マージする
+- Claude はコメント内の指示に従って動作するため、指示は具体的に書いてください。
+- 対応結果は GitHub コメントで報告されます。
+- 作成された PR は人間がレビューし、マージします。

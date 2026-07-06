@@ -4,7 +4,7 @@ title: Getting Started
 
 # Getting Started
 
-このガイドでは、Misora Connect API を使い始めるための手順を説明します。
+Misora Connect API を使い始めるための手順を説明します。
 
 ## 前提条件
 
@@ -15,12 +15,11 @@ title: Getting Started
 ## ステップ 1: API キーを確認する
 
 Misora Connect API へのアクセスには API キーが必要です。
-
-API キーの発行・確認については、Misora Connect の管理者にお問い合わせください。
+API キーの発行や確認については、Misora Connect の管理者にお問い合わせください。
 
 ## ステップ 2: 最初のリクエストを送信する
 
-API キーを取得したら、SIM 一覧の取得を試してみましょう。
+API キーを取得したら、まず SIM 一覧の取得を試します。
 
 ### curl の場合
 
@@ -63,7 +62,7 @@ print(response.json())
 
 ## ステップ 3: SIM のサマリーを確認する
 
-SIM 全体のステータス別集計を取得できます。
+SIM 全体のステータス別集計は次のエンドポイントで取得します。
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
@@ -81,7 +80,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ## ステップ 4: 通信量を確認する
 
-特定の SIM の月別通信量を取得してみましょう。
+特定の SIM の月別通信量は次のエンドポイントで取得します。
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
@@ -104,13 +103,13 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ### API キー
 
-API へのアクセスにはリクエストヘッダーに `x-api-key` を含める必要があります。
+API へのアクセスには、リクエストヘッダーに `x-api-key` を含める必要があります。
 
 ```
 x-api-key: YOUR_API_KEY
 ```
 
-API キーが不正または未指定の場合、`403 Forbidden` が返ります。
+API キーが不正、または未指定の場合は `403 Forbidden` が返ります。
 
 ## レート制限
 
@@ -125,7 +124,7 @@ API にはレート制限が設定されています。
 
 ## エラーハンドリング
 
-API はエラー時に適切な HTTP ステータスコードと JSON レスポンスを返します。
+API はエラー時に、対応する HTTP ステータスコードと JSON レスポンスを返します。
 
 ```json
 {
@@ -136,12 +135,12 @@ API はエラー時に適切な HTTP ステータスコードと JSON レスポ�
 | ステータスコード | 説明 |
 |---|---|
 | `400` | リクエストパラメータの不正 |
-| `403` | 認証失敗・アクセス権限なし |
+| `403` | 認証失敗、またはアクセス権限なし |
 | `404` | リソースが見つからない |
 | `429` | レート制限超過 |
 | `500` | サーバー内部エラー |
 
 ## 次のステップ
 
-- [User Guide](user-guide.md) で各機能の詳しい使い方を学ぶ
+- [User Guide](user-guide.md) で各機能の詳しい使い方を確認する
 - [API Reference](reference.md) で全エンドポイントの仕様を確認する
