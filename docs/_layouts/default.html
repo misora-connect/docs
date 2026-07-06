@@ -457,9 +457,13 @@
         font-size: 0.9em;
       }
 
-      /* コードブロック */
-      .markdown-body pre {
+      /* コードブロック（Primer の .highlight を含めて上書き） */
+      .markdown-body pre,
+      .markdown-body pre.highlight,
+      .markdown-body div.highlight,
+      .markdown-body div.highlight pre {
         background: var(--mc-color-background-alt);
+        color: var(--mc-color-text-primary);
         border: 1px solid var(--mc-color-border-light);
         border-left: 4px solid var(--mc-color-primary);
         border-radius: var(--mc-radius-md);
@@ -468,7 +472,17 @@
         box-shadow: var(--mc-shadow-sm);
       }
 
-      .markdown-body pre code {
+      /* .highlight は入れ子なので、内側の <pre> は装飾を持たない */
+      .markdown-body div.highlight pre {
+        border: 0;
+        padding: 0;
+        box-shadow: none;
+        background: transparent;
+      }
+
+      .markdown-body pre code,
+      .markdown-body pre.highlight code,
+      .markdown-body div.highlight code {
         background: transparent;
         color: var(--mc-color-text-primary);
         padding: 0;
