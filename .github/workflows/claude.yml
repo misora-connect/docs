@@ -17,6 +17,9 @@ jobs:
       issues: write
       id-token: write
     steps:
+      - name: Clean up Docker-generated files
+        run: sudo rm -rf _site
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
