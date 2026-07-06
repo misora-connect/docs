@@ -13,6 +13,7 @@ Misora Connect API は、SIM カードの管理、通信量の統計、データ
 | [Getting Started](getting-started.md) | API キーの取得から最初の API 呼び出しまで |
 | [User Guide](user-guide.md) | 各機能の使い方と実践的なユースケース |
 | [API Reference](reference.md) | 全エンドポイントの詳細仕様 |
+| [OpenAPI Spec (Swagger UI)](spec/) | OpenAPI 3.0 仕様と対話的リファレンス |
 
 ## API の概要
 
