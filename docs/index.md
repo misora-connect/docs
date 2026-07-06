@@ -2,8 +2,8 @@
 title: misora-connect ドキュメント
 ---
 
-# docs for misora-connect
+# misora-connect ドキュメント
 
 ## ドキュメント一覧
 
-- [API ドキュメント](api/) — Misora Connect API のリファレンス、User Guide、Getting Started
+- [API ドキュメント](api/)：Misora Connect API のリファレンス、User Guide、Getting Started を掲載しています。
