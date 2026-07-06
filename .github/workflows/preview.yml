@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event.action != 'closed'
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, colima]
     env:
       PREVIEW_BUCKET: misora-docs-preview
@@ -82,7 +82,7 @@ jobs:
             }
 
   cleanup:
-    if: github.event.action == 'closed'
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, colima]
     env:
       PREVIEW_BUCKET: misora-docs-preview
