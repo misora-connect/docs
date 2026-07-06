@@ -1,0 +1,1226 @@
+openapi: 3.0.3
+info:
+  title: Misora Connect API
+  description: |
+    SIM の管理、通信量の統計、データエクスポート、リチャージなどの機能を提供する REST API です。
+
+    ## Authentication
+    全てのリクエストに `x-api-key` ヘッダが必要です。
+
+    ## Customer Code
+    `customer_code`（9桁数字）は省略可能です。省略時は API Key に紐づく顧客コードが自動的に使用されます。
+
+    ## レスポンス形式
+    全て JSON 形式で返却されます。日時は ISO 8601 形式（`YYYY-MM-DDTHH:MM:SSZ`）です。
+  version: "1.0"
+
+servers:
+  - url: https://api.misora-connect.com/v1
+    description: Production
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: SIM Management
+    description: SIM の一覧取得、詳細情報の参照、サマリー統計の取得
+  - name: Statistics
+    description: SIM の通信量統計・CDR（通信明細）・累積使用量
+  - name: Exports
+    description: SIM データの CSV/JSON/JSONL エクスポート
+  - name: Recharges
+    description: SIM プランのリチャージ（容量追加）管理
+
+paths:
+  # ===== SIM Management =====
+  /sims:
+    get:
+      tags: [SIM Management]
+      summary: SIM 一覧取得
+      description: 顧客に紐づく SIM のページネーション付き一覧を取得します。
+      operationId: listSims
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+        - name: limit
+          in: query
+          description: 取得件数（最大 1000）
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+        - name: offset
+          in: query
+          description: ページネーションオフセット
+          schema:
+            type: integer
+            default: 0
+        - name: order_by
+          in: query
+          description: ソートキー
+          schema:
+            type: string
+            default: sim_id
+            enum: [sim_id, customer_code, status, created_at, updated_at]
+        - name: order_direction
+          in: query
+          description: ソート方向
+          schema:
+            type: string
+            default: asc
+            enum: [asc, desc]
+        - name: include_terminated
+          in: query
+          description: 解約済み SIM を含めるか
+          schema:
+            type: boolean
+            default: false
+        - name: filter_nulls
+          in: query
+          description: null フィールドを除外するか
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Sim"
+              example:
+                - sim_id: "SIM001"
+                  customer_code: "110139701"
+                  iccid: "8981080321000912770"
+                  status: active
+                  created_at: "2025-01-01T00:00:00Z"
+                  updated_at: "2026-01-01T00:00:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /sims/{sim_id}:
+    get:
+      tags: [SIM Management]
+      summary: SIM 詳細取得
+      description: 特定の SIM の詳細情報を取得します。
+      operationId: getSim
+      parameters:
+        - name: sim_id
+          in: path
+          required: true
+          description: SIM 識別子
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CustomerCode"
+        - name: filter_nulls
+          in: query
+          description: null フィールドを除外するか
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimDetail"
+              example:
+                sim_id: "SIM001"
+                customer_code: "110139701"
+                iccid: "8981080321000912770"
+                status: active
+                plan_type: capacity
+                created_at: "2025-01-01T00:00:00Z"
+                updated_at: "2026-01-01T00:00:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /sims/summary:
+    get:
+      tags: [SIM Management]
+      summary: SIM サマリー取得
+      description: 顧客に紐づく全 SIM の集計サマリー情報を取得します。
+      operationId: getSimSummary
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimSummary"
+              example:
+                total_sims: 150
+                active_sims: 142
+                suspended_sims: 8
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ===== Statistics =====
+  /stats/sims/monthly_usage:
+    get:
+      tags: [Statistics]
+      summary: 月次通信量（全 SIM）
+      description: 顧客の全 SIM の月次通信量集計データを取得します（直近12ヶ月分）。
+      operationId: getMonthlyUsage
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MonthlyUsage"
+              example:
+                - year_month: "2026-03"
+                  downlink_bytes: 1500000000
+                  uplink_bytes: 500000000
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /stats/sims/cumulative_usage:
+    get:
+      tags: [Statistics]
+      summary: 全 SIM 累積通信量
+      description: |
+        顧客の全 SIM の累積通信量を一括取得します。日次で更新されます。
+
+        30,000 件以下の場合は JSON 配列を直接返却します。
+        30,000 件を超える場合は S3 にエクスポートし、署名付きダウンロード URL へ 302 リダイレクトします（gzip 圧縮 NDJSON、5分有効）。
+      operationId: getCustomerCumulativeUsage
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功（30,000 件以下）
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomerCumulativeUsage"
+              example:
+                - sim_id: "8981080321000912770"
+                  customer_code: "110139701"
+                  msisdn: "812001004300889"
+                  downlink_bytes: 50000000000
+                  uplink_bytes: 15000000000
+                  total_bytes: 65000000000
+                  checked_at: "2026-03-06T00:00:00Z"
+                  latest_record_time: "2026-03-06T00:00:00Z"
+        "302":
+          description: 大規模データ（30,000 件超）— S3 署名付き URL へリダイレクト
+          headers:
+            Location:
+              description: S3 presigned URL（gzip 圧縮 NDJSON、5分有効）
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          description: Snowflake 未設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /stats/sims/current_plan_usage:
+    get:
+      tags: [Statistics]
+      summary: 全 SIM 現プラン消費量
+      description: |
+        顧客の全 SIM の「現プランでの消費量」を一括取得します。
+
+        各 SIM の `current_plan_used_bytes` は、累積通信量 (`total_bytes`)
+        から最新の Executed リチャージ予約の `usage_offset_bytes` を引いた
+        値です。`usage_offset_bytes` が記録されていない SIM では
+        `current_plan_used_bytes` は `null` を返します。
+      operationId: getCustomerCurrentPlanUsage
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CurrentPlanUsage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          description: Snowflake 未設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /stats/sims/{sim_id}/current_plan_usage:
+    get:
+      tags: [Statistics]
+      summary: SIM 現プラン消費量
+      description: |
+        特定 SIM の「現プランでの消費量」を取得します。
+
+        `current_plan_used_bytes` は、累積通信量 (`total_bytes`) から
+        最新の Executed リチャージ予約の `usage_offset_bytes` を引いた
+        値です。`usage_offset_bytes` が記録されていない場合は `null` を
+        返します。
+      operationId: getSimCurrentPlanUsage
+      parameters:
+        - name: sim_id
+          in: path
+          required: true
+          description: SIM 識別子
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CurrentPlanUsage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          description: Snowflake 未設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /stats/sims/{sim_id}/monthly_usage:
+    get:
+      tags: [Statistics]
+      summary: SIM 別月次通信量
+      description: 特定 SIM の月次通信量を取得します（直近12ヶ月分）。
+      operationId: getSimMonthlyUsage
+      parameters:
+        - name: sim_id
+          in: path
+          required: true
+          description: SIM 識別子
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SimMonthlyUsage"
+              example:
+                - sim_id: "SIM001"
+                  customer_code: "110139701"
+                  year_month: "2026-03"
+                  downlink_bytes: 1000000000
+                  uplink_bytes: 300000000
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /stats/sims/{sim_id}/details:
+    get:
+      tags: [Statistics]
+      summary: SIM CDR（通信明細）
+      description: 特定 SIM の通信明細（CDR）を取得します。直近 288 件（約12日分）のレコードが返却されます。
+      operationId: getSimDetails
+      parameters:
+        - name: sim_id
+          in: path
+          required: true
+          description: SIM 識別子
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CdrRecord"
+              example:
+                - sim_id: "SIM001"
+                  customer_code: "110139701"
+                  record_begins_at: "2026-03-06T10:30:00Z"
+                  downlink_bytes: 50000000
+                  uplink_bytes: 10000000
+                  session_duration_seconds: 3600
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /stats/sims/{sim_id}/cumulative_usage:
+    get:
+      tags: [Statistics]
+      summary: 累積通信量
+      description: 特定 SIM の累積通信量を取得します。日次で更新されます。
+      operationId: getSimCumulativeUsage
+      parameters:
+        - name: sim_id
+          in: path
+          required: true
+          description: SIM 識別子
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CumulativeUsage"
+              example:
+                - last_updated_at: "2026-03-06T00:00:00Z"
+                  downlink_bytes: 50000000000
+                  uplink_bytes: 15000000000
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ===== Exports =====
+  /exports:
+    get:
+      tags: [Exports]
+      summary: エクスポート種別一覧
+      description: 利用可能なエクスポート種別の一覧を取得します。
+      operationId: listExports
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exports:
+                    type: array
+                    items:
+                      type: string
+              example:
+                exports: ["sims"]
+
+  /exports/sims:
+    post:
+      tags: [Exports]
+      summary: SIM データエクスポート
+      description: |
+        SIM データのエクスポートをリクエストします。
+
+        - **非同期モード**（デフォルト）: 即座に署名付きダウンロード URL を返却し、バックグラウンドで処理を実行します。
+        - **同期モード**: 処理完了まで待機します。
+
+        解約済み SIM は除外されます。
+      operationId: createSimExport
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+        - name: format
+          in: query
+          description: 出力形式
+          schema:
+            type: string
+            default: csv
+            enum: [csv, json, jsonl]
+        - name: async
+          in: query
+          description: "`true`: 非同期処理（即時レスポンス）、`false`: 同期処理（完了待ち）"
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ExportAsync"
+                  - $ref: "#/components/schemas/ExportSync"
+              examples:
+                async:
+                  summary: 非同期レスポンス
+                  value:
+                    file_name: "sims_export_110139801_01KABHF5NQGE8S4AT877421K6J.csv"
+                    download_url: "https://mc-prod-exports.s3.amazonaws.com/..."
+                    message: "Export is being processed. The file will be available shortly at the download URL."
+                    expires_in_seconds: 86400
+                sync:
+                  summary: 同期レスポンス
+                  value:
+                    file_name: "sims_export_110139801_01KABHF5NQGE8S4AT877421K6J.csv"
+                    row_count: 70
+                    file_size_bytes: 29151
+                    s3_url: "s3://mc-prod-exports/sims_export_110139801_..."
+                    download_url: "https://mc-prod-exports.s3.amazonaws.com/..."
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          description: 内部サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ===== Recharges =====
+  /recharges/sims:
+    get:
+      tags: [Recharges]
+      summary: リチャージ対象 SIM 一覧
+      description: リチャージ対象となる SIM の一覧を取得します。各 SIM のリチャージ可否、現在のプラン情報、予約件数が含まれます。
+      operationId: listRechargeSims
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+        - $ref: "#/components/parameters/IccidQuery"
+        - $ref: "#/components/parameters/SimIdQuery"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RechargeSimsResponse"
+              example:
+                sims:
+                  - iccid: "8981080321000912770"
+                    product_code: "PM058"
+                    plan_type: capacity
+                    extension_end_date: "2026-03-05"
+                    reservation_count: 1
+                    recharge_available: true
+                    usage_offset_bytes: 647080707
+                total_count: 2
+                page_size: 200
+                has_more: false
+                next_cursor: null
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /recharges/sims/{sim_id}/plans:
+    get:
+      tags: [Recharges]
+      summary: SIM 別リチャージプラン
+      description: 特定 SIM の現在のプランに基づいて、利用可能なリチャージプランを取得します。
+      operationId: getSimRechargePlans
+      parameters:
+        - name: sim_id
+          in: path
+          required: true
+          description: SIM ID（ICCID）
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlansResponse"
+              example:
+                plans:
+                  - plan_code: "OI061331"
+                    plan_type: capacity
+                    capacity_limit: 10.0
+                    daily_limit: null
+                    duration_days: 30
+                total_count: 2
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /recharges/plans:
+    get:
+      tags: [Recharges]
+      summary: 全リチャージプラン一覧
+      description: 顧客が利用可能な全リチャージプランのカタログを取得します。
+      operationId: listRechargePlans
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlansResponse"
+              example:
+                plans:
+                  - plan_code: "OI061331"
+                    plan_type: capacity
+                    capacity_limit: 10.0
+                    daily_limit: null
+                    duration_days: 30
+                  - plan_code: "OI061340"
+                    plan_type: daily
+                    capacity_limit: null
+                    daily_limit: 3.0
+                    duration_days: 90
+                total_count: 3
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /recharges/plans/{plan_code}:
+    get:
+      tags: [Recharges]
+      summary: プラン詳細
+      description: 特定のリチャージプランの詳細情報を取得します。
+      operationId: getRechargePlan
+      parameters:
+        - name: plan_code
+          in: path
+          required: true
+          description: プラン識別子
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Plan"
+              example:
+                plan_code: "OI061331"
+                plan_type: capacity
+                capacity_limit: 10.0
+                daily_limit: null
+                duration_days: 30
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /recharges/reservations:
+    get:
+      tags: [Recharges]
+      summary: リチャージ予約一覧
+      description: 顧客のリチャージ予約一覧を取得します。ICCID / SIM ID やステータスでのフィルタリングが可能です。
+      operationId: listReservations
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+        - $ref: "#/components/parameters/IccidQuery"
+        - $ref: "#/components/parameters/SimIdQuery"
+        - name: status
+          in: query
+          description: ステータスでフィルタ
+          schema:
+            type: string
+            enum: [reserved, executed, failed]
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReservationsResponse"
+              example:
+                reservations:
+                  - reservation_id: "RR-00012"
+                    iccid: "8981080321000912770"
+                    plan_code: "OI061331"
+                    status: Executed
+                    reserved_at: "2026-03-10T10:30:00Z"
+                    executed_at: "2026-03-10T10:30:02Z"
+                total_count: 1
+                page_size: 200
+                has_more: false
+                next_cursor: null
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+    post:
+      tags: [Recharges]
+      summary: リチャージ予約作成
+      description: SIM に対するリチャージ予約を作成します。1つの SIM に対して最大3件の予約が可能です。
+      operationId: createReservation
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReservationRequest"
+            example:
+              sim_id: "8981080321000912770"
+              plan_code: "OI061331"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+              example:
+                reservation_id: "RR-00012"
+                status: 予約済み
+                reserved_at: "2026-03-10T10:30:00Z"
+                executed_at: null
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /recharges/immediate:
+    post:
+      tags: [Recharges]
+      summary: 即時リチャージ（プラン即時書換・残量リセット）
+      description: |
+        ICCID とプランコードを指定して、**即時にプラン書換・残量リセット・PCRF 1 回 sync** を実行します。
+        容量型プランのみ対象（日次型・CPFR・Internal はエラー）。予約の作成と実行をその場で行い、
+        予約は即 `Executed` 化されます。
+
+        `force=true` で既存 `Reserved` 予約を `Cancelled` 化して前倒し実行します。
+        PCRF 同期中（`SyncStatus=実行中`）は force 不問で `409 ALREADY_SYNCING`。
+      operationId: immediateRecharge
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImmediateRechargeRequest"
+            example:
+              sim_id: "8981080301011327143"
+              plan_code: "OI071522"
+              force: false
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImmediateRechargeResponse"
+              example:
+                iccid: "8981080301011327143"
+                plan_code: "OI071522"
+                status: Executed
+                reservation_id: "a1XRB000005P7Q12AK"
+                sync_status: 実行中
+                superseded_reservation_ids: []
+                error_code: null
+                message: "Immediate recharge executed. PCRF sync triggered."
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: 指定 SIM に対するリチャージ権限がありません
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 進行中予約あり、もしくは PCRF 同期中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "503":
+          description: 累積 usage 取得失敗（DML 前に中断）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API Key
+
+  parameters:
+    CustomerCode:
+      name: customer_code
+      in: query
+      description: 9桁の顧客コード。省略時は API Key に紐づく顧客コードを使用
+      schema:
+        type: string
+        pattern: '^\d{9}$'
+        example: "110139701"
+    PageSize:
+      name: page_size
+      in: query
+      description: 1ページあたりの件数
+      schema:
+        type: integer
+        default: 200
+    Cursor:
+      name: cursor
+      in: query
+      description: ページネーションカーソル
+      schema:
+        type: string
+    IccidQuery:
+      name: iccid
+      in: query
+      description: SIM の ICCID でフィルタ。`sim_id` と併用された場合は `iccid` を優先
+      schema:
+        type: string
+    SimIdQuery:
+      name: sim_id
+      in: query
+      description: SIM ID (ICCID のエイリアス) でフィルタ
+      schema:
+        type: string
+
+  schemas:
+    # ----- SIM -----
+    Sim:
+      type: object
+      properties:
+        sim_id:
+          type: string
+        customer_code:
+          type: string
+        iccid:
+          type: string
+        status:
+          type: string
+          enum: [active, suspended, terminated]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SimDetail:
+      allOf:
+        - $ref: "#/components/schemas/Sim"
+        - type: object
+          properties:
+            plan_type:
+              type: string
+              enum: [capacity, daily]
+
+    SimSummary:
+      type: object
+      properties:
+        total_sims:
+          type: integer
+        active_sims:
+          type: integer
+        suspended_sims:
+          type: integer
+
+    # ----- Statistics -----
+    MonthlyUsage:
+      type: object
+      properties:
+        year_month:
+          type: string
+          example: "2026-03"
+        downlink_bytes:
+          type: integer
+        uplink_bytes:
+          type: integer
+
+    SimMonthlyUsage:
+      allOf:
+        - type: object
+          properties:
+            sim_id:
+              type: string
+            customer_code:
+              type: string
+        - $ref: "#/components/schemas/MonthlyUsage"
+
+    CdrRecord:
+      type: object
+      properties:
+        sim_id:
+          type: string
+        customer_code:
+          type: string
+        record_begins_at:
+          type: string
+          format: date-time
+        downlink_bytes:
+          type: integer
+        uplink_bytes:
+          type: integer
+        session_duration_seconds:
+          type: integer
+
+    CumulativeUsage:
+      type: object
+      properties:
+        last_updated_at:
+          type: string
+          format: date-time
+        downlink_bytes:
+          type: integer
+        uplink_bytes:
+          type: integer
+
+    CustomerCumulativeUsage:
+      type: object
+      properties:
+        sim_id:
+          type: string
+          description: SIM 識別子 (ICCID)
+        customer_code:
+          type: string
+        msisdn:
+          type: string
+        downlink_bytes:
+          type: integer
+        uplink_bytes:
+          type: integer
+        total_bytes:
+          type: integer
+        checked_at:
+          type: string
+          format: date-time
+        latest_record_time:
+          type: string
+          format: date-time
+
+    CurrentPlanUsage:
+      type: object
+      properties:
+        sim_id:
+          type: string
+          description: SIM 識別子 (ICCID)
+        customer_code:
+          type: string
+        msisdn:
+          type: string
+        downlink_bytes:
+          type: integer
+        uplink_bytes:
+          type: integer
+        total_bytes:
+          type: integer
+          description: 累積通信量
+        checked_at:
+          type: string
+          format: date-time
+        latest_record_time:
+          type: string
+          format: date-time
+        plan_code:
+          type: string
+          nullable: true
+          description: 最新の Executed リチャージ予約のプランコード
+        plan_started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 現プラン開始時刻 (最新 Executed リチャージ予約の実行日時)
+        usage_offset_bytes:
+          type: integer
+          nullable: true
+          description: プラン適用時点の累積通信量
+        current_plan_used_bytes:
+          type: integer
+          nullable: true
+          description: 現プランでの消費量 = total_bytes − usage_offset_bytes (offset 不明時は null)
+
+    # ----- Exports -----
+    ExportAsync:
+      type: object
+      properties:
+        file_name:
+          type: string
+        download_url:
+          type: string
+        message:
+          type: string
+        expires_in_seconds:
+          type: integer
+
+    ExportSync:
+      type: object
+      properties:
+        file_name:
+          type: string
+        row_count:
+          type: integer
+        file_size_bytes:
+          type: integer
+        s3_url:
+          type: string
+        download_url:
+          type: string
+
+    # ----- Recharges -----
+    RechargeSim:
+      type: object
+      properties:
+        iccid:
+          type: string
+        product_code:
+          type: string
+        plan_type:
+          type: string
+          enum: [capacity, daily]
+        extension_end_date:
+          type: string
+          format: date
+        reservation_count:
+          type: integer
+        recharge_available:
+          type: boolean
+        usage_offset_bytes:
+          type: integer
+          description: |
+            現プランの容量計算の起点バイト数（直近実行済み予約の通算転送容量オフセット）。
+            `現プラン使用量 = 通算転送容量 − usage_offset_bytes` で算出。未リチャージ時は 0。
+
+    RechargeSimsResponse:
+      type: object
+      properties:
+        sims:
+          type: array
+          items:
+            $ref: "#/components/schemas/RechargeSim"
+        total_count:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
+        next_cursor:
+          type: string
+          nullable: true
+
+    Plan:
+      type: object
+      properties:
+        plan_code:
+          type: string
+        plan_type:
+          type: string
+          enum: [capacity, daily]
+        capacity_limit:
+          type: number
+          nullable: true
+          description: GB 上限（capacity プランのみ）
+        daily_limit:
+          type: number
+          nullable: true
+          description: 日次 GB 上限（daily プランのみ）
+        duration_days:
+          type: integer
+        plan_detail:
+          type: string
+          nullable: true
+          description: プラン詳細（商談商品名）
+
+    PlansResponse:
+      type: object
+      properties:
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/Plan"
+        total_count:
+          type: integer
+
+    CreateReservationRequest:
+      type: object
+      required: [plan_code]
+      description: |
+        `iccid` または `sim_id` のいずれか必須。両指定 + 異なる値、または両欠落は 400 を返します。両指定 + 同値は許容。
+      properties:
+        iccid:
+          type: string
+          description: 対象 SIM の ICCID
+        sim_id:
+          type: string
+          description: SIM ID（ICCID のエイリアス）
+        plan_code:
+          type: string
+          description: リチャージプランコード
+
+    Reservation:
+      type: object
+      properties:
+        reservation_id:
+          type: string
+        status:
+          type: string
+        reserved_at:
+          type: string
+          format: date-time
+        executed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 実行日時（未実行時 null）
+
+    ReservationDetail:
+      allOf:
+        - $ref: "#/components/schemas/Reservation"
+        - type: object
+          properties:
+            iccid:
+              type: string
+            plan_code:
+              type: string
+
+    ImmediateRechargeRequest:
+      type: object
+      required: [plan_code]
+      description: |
+        `iccid` または `sim_id` のいずれか必須。両指定 + 異なる値、または両欠落は 400 を返します。両指定 + 同値は許容。
+      properties:
+        iccid:
+          type: string
+          description: 対象 SIM の ICCID（19-20 桁）
+        sim_id:
+          type: string
+          description: SIM ID（ICCID のエイリアス）
+        plan_code:
+          type: string
+          description: 書き換え先プランコード（容量型のみ）
+        force:
+          type: boolean
+          default: false
+          description: |
+            `true` のとき既存 `Reserved` 予約を Cancelled 化して前倒し実行する。
+            既定 `false` の場合は進行中予約があると `409 RESERVATION_EXISTS`。
+
+    ImmediateRechargeResponse:
+      type: object
+      description: |
+        即時リチャージ結果。成功時は `status='Executed'` で `reservation_id` 等が埋まる。
+      properties:
+        iccid:
+          type: string
+        plan_code:
+          type: string
+        status:
+          type: string
+          nullable: true
+          description: 予約ステータス（成功時 `Executed`）
+        reservation_id:
+          type: string
+          nullable: true
+          description: 生成された予約レコード ID
+        sync_status:
+          type: string
+          nullable: true
+          description: Inventory の同期ステータス（成功時 `実行中` → 下流で `実行済`）
+        superseded_reservation_ids:
+          type: array
+          items:
+            type: string
+          description: force で Cancelled 化した既存 Reserved 予約 ID
+        error_code:
+          type: string
+          nullable: true
+        message:
+          type: string
+
+    ReservationsResponse:
+      type: object
+      properties:
+        reservations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReservationDetail"
+        total_count:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
+        next_cursor:
+          type: string
+          nullable: true
+
+    # ----- Common -----
+    Error:
+      type: object
+      properties:
+        detail:
+          oneOf:
+            - type: string
+            - type: object
+              properties:
+                errorCode:
+                  type: string
+                message:
+                  type: string
+
+  responses:
+    BadRequest:
+      description: バリデーションエラー
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: リソースが見つからない
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BadGateway:
+      description: 上流サービスエラー
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
