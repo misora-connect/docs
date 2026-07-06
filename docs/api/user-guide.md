@@ -70,7 +70,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims/sim-001"
+  "https://api.misora-connect.com/v1/sims/8981100000000000001"
 ```
 
 ### SIM サマリーの取得
@@ -101,7 +101,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/stats/sims/sim-001/monthly_usage"
+  "https://api.misora-connect.com/v1/stats/sims/8981100000000000001/monthly_usage"
 ```
 
 レスポンスには `downlink_bytes`（下り）と `uplink_bytes`（上り）がバイト単位で含まれます。
@@ -112,7 +112,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/stats/sims/sim-001/details"
+  "https://api.misora-connect.com/v1/stats/sims/8981100000000000001/details"
 ```
 
 レスポンスには接続情報（IMSI、IMEI、APN、IP アドレス）とパケット数も含まれます。
@@ -123,7 +123,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/stats/sims/sim-001/cumulative_usage"
+  "https://api.misora-connect.com/v1/stats/sims/8981100000000000001/cumulative_usage"
 ```
 
 #### 全 SIM の累積通信量
