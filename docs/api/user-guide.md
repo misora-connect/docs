@@ -225,7 +225,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 {
   "sims": [
     {
-      "iccid": "8981100000000000001",
+      "sim_id": "8981100000000000001",
       "product_code": "PROD-001",
       "plan_type": "capacity",
       "extension_end_date": "2026-07-31",
@@ -249,7 +249,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```bash
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/recharges/sims/8981100000000000001/plans"
+  "https://api.misora-connect.com/v1/recharges/sims/sim-001/plans"
 ```
 
 #### 全プランの一覧
@@ -287,7 +287,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 ```bash
 curl -X POST -H "x-api-key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"iccid": "8981100000000000001", "plan_code": "PLAN-001"}' \
+  -d '{"sim_id": "8981100000000000001", "plan_code": "PLAN-001"}' \
   "https://api.misora-connect.com/v1/recharges/reservations"
 ```
 
@@ -307,13 +307,13 @@ curl -H "x-api-key: YOUR_API_KEY" \
 ```
 
 フィルタリングオプション:
-- `iccid`: 特定 SIM の予約のみ
+- `sim_id`: 特定 SIM の予約のみ
 - `status`: ステータスで絞り込み（`reserved`、`executed`、`failed`）
 
 ```bash
 # 特定 SIM の実行済み予約のみ
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/recharges/reservations?iccid=8981100000000000001&status=executed"
+  "https://api.misora-connect.com/v1/recharges/reservations?sim_id=8981100000000000001&status=executed"
 ```
 
 ---
