@@ -364,7 +364,7 @@ SIM データのエクスポートをリクエストします。解約済み SIM
 {
   "sims": [
     {
-      "iccid": "8981100000000000001",
+      "sim_id": "8981100000000000001",
       "product_code": "PROD-001",
       "plan_type": "capacity",
       "extension_end_date": "2026-07-31",
@@ -384,7 +384,7 @@ SIM データのエクスポートをリクエストします。解約済み SIM
 
 | フィールド | 型 | 説明 |
 |---|---|---|
-| `iccid` | string | IC カード識別番号 |
+| `sim_id` | string | SIM の一意識別子（ICCID） |
 | `product_code` | string | プロダクトコード |
 | `plan_type` | string | プランタイプ（`capacity` / `daily`） |
 | `extension_end_date` | string | 延長期限日 |
@@ -403,7 +403,7 @@ SIM データのエクスポートをリクエストします。解約済み SIM
 
 ---
 
-### GET /v1/recharges/sims/{iccid}/plans
+### GET /v1/recharges/sims/{sim_id}/plans
 
 特定 SIM で利用可能なリチャージプランを取得します。
 
@@ -411,7 +411,7 @@ SIM データのエクスポートをリクエストします。解約済み SIM
 
 | パラメータ | 型 | 説明 |
 |---|---|---|
-| `iccid` | string | IC カード識別番号 |
+| `sim_id` | string | SIM の一意識別子（ICCID） |
 
 **レスポンス** `200 OK`
 
@@ -484,14 +484,14 @@ SIM データのエクスポートをリクエストします。解約済み SIM
 
 ```json
 {
-  "iccid": "8981100000000000001",
+  "sim_id": "8981100000000000001",
   "plan_code": "PLAN-001"
 }
 ```
 
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
-| `iccid` | string | Yes | リチャージ対象の ICCID |
+| `sim_id` | string | Yes | リチャージ対象の SIM ID（ICCID） |
 | `plan_code` | string | Yes | 適用するプランコード |
 
 **レスポンス** `200 OK`
@@ -508,7 +508,7 @@ SIM データのエクスポートをリクエストします。解約済み SIM
 
 | ステータス | 条件 |
 |---|---|
-| `400` | 必須フィールドの不足、不正な ICCID やプランコード |
+| `400` | 必須フィールドの不足、不正な SIM ID やプランコード |
 | `403` | アクセス権限なし |
 | `502` | 下流サービスのエラー |
 
@@ -533,7 +533,7 @@ SIM データのエクスポートをリクエストします。解約済み SIM
 
 | パラメータ | 型 | 必須 | デフォルト | 説明 |
 |---|---|---|---|---|
-| `iccid` | string | No | - | 特定 SIM でフィルタ |
+| `sim_id` | string | No | - | 特定 SIM でフィルタ |
 | `status` | string | No | - | ステータスでフィルタ。`reserved` / `executed` / `failed` |
 | `page_size` | integer | No | 200 | 1ページあたりの件数 |
 | `cursor` | string | No | - | ページネーションカーソル |
@@ -545,7 +545,7 @@ SIM データのエクスポートをリクエストします。解約済み SIM
   "reservations": [
     {
       "reservation_id": "rsv-001",
-      "iccid": "8981100000000000001",
+      "sim_id": "8981100000000000001",
       "plan_code": "PLAN-001",
       "status": "executed",
       "reserved_at": "2026-06-16T10:00:00Z",
@@ -564,7 +564,7 @@ SIM データのエクスポートをリクエストします。解約済み SIM
 | フィールド | 型 | 説明 |
 |---|---|---|
 | `reservation_id` | string | 予約 ID |
-| `iccid` | string | 対象の ICCID |
+| `sim_id` | string | SIM の一意識別子（ICCID） |
 | `plan_code` | string | プランコード |
 | `status` | string | ステータス。`reserved`（予約済み）/ `executed`（実行済み）/ `failed`（失敗） |
 | `reserved_at` | string | 予約日時（ISO 8601） |

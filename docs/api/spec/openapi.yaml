@@ -520,7 +520,7 @@ paths:
                 $ref: "#/components/schemas/RechargeSimsResponse"
               example:
                 sims:
-                  - iccid: "8981080321000912770"
+                  - sim_id: "8981080321000912770"
                     product_code: "PM058"
                     plan_type: capacity
                     extension_end_date: "2026-03-05"
@@ -641,7 +641,7 @@ paths:
     get:
       tags: [Recharges]
       summary: リチャージ予約一覧
-      description: 顧客のリチャージ予約一覧を取得します。ICCID / SIM ID やステータスでのフィルタリングが可能です。
+      description: 顧客のリチャージ予約一覧を取得します。SIM ID やステータスでのフィルタリングが可能です。
       operationId: listReservations
       parameters:
         - $ref: "#/components/parameters/CustomerCode"
@@ -665,7 +665,7 @@ paths:
               example:
                 reservations:
                   - reservation_id: "RR-00012"
-                    iccid: "8981080321000912770"
+                    sim_id: "8981080321000912770"
                     plan_code: "OI061331"
                     status: Executed
                     reserved_at: "2026-03-10T10:30:00Z"
@@ -720,7 +720,7 @@ paths:
       tags: [Recharges]
       summary: 即時リチャージ（プラン即時書換・残量リセット）
       description: |
-        ICCID とプランコードを指定して、**即時にプラン書換・残量リセット・PCRF 1 回 sync** を実行します。
+        SIM ID とプランコードを指定して、**即時にプラン書換・残量リセット・PCRF 1 回 sync** を実行します。
         容量型プランのみ対象（日次型・CPFR・Internal はエラー）。予約の作成と実行をその場で行い、
         予約は即 `Executed` 化されます。
 
@@ -747,7 +747,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ImmediateRechargeResponse"
               example:
-                iccid: "8981080301011327143"
+                sim_id: "8981080301011327143"
                 plan_code: "OI071522"
                 status: Executed
                 reservation_id: "a1XRB000005P7Q12AK"
@@ -813,13 +813,14 @@ components:
     IccidQuery:
       name: iccid
       in: query
-      description: SIM の ICCID でフィルタ。`sim_id` と併用された場合は `iccid` を優先
+      description: "（後方互換）SIM の ICCID でフィルタ。`sim_id` の使用を推奨"
       schema:
         type: string
+      deprecated: true
     SimIdQuery:
       name: sim_id
       in: query
-      description: SIM ID (ICCID のエイリアス) でフィルタ
+      description: SIM ID（ICCID）でフィルタ
       schema:
         type: string
 
@@ -1008,8 +1009,9 @@ components:
     RechargeSim:
       type: object
       properties:
-        iccid:
+        sim_id:
           type: string
+          description: SIM の一意識別子（ICCID）
         product_code:
           type: string
         plan_type:
@@ -1080,16 +1082,17 @@ components:
 
     CreateReservationRequest:
       type: object
-      required: [plan_code]
+      required: [sim_id, plan_code]
       description: |
-        `iccid` または `sim_id` のいずれか必須。両指定 + 異なる値、または両欠落は 400 を返します。両指定 + 同値は許容。
+        `sim_id` 必須。後方互換のため `iccid` も受け付けます（両指定 + 異なる値は 400）。
       properties:
-        iccid:
-          type: string
-          description: 対象 SIM の ICCID
         sim_id:
           type: string
-          description: SIM ID（ICCID のエイリアス）
+          description: 対象 SIM の SIM ID（ICCID）
+        iccid:
+          type: string
+          description: "（後方互換）対象 SIM の ICCID。`sim_id` の使用を推奨"
+          deprecated: true
         plan_code:
           type: string
           description: リチャージプランコード
@@ -1115,23 +1118,25 @@ components:
         - $ref: "#/components/schemas/Reservation"
         - type: object
           properties:
-            iccid:
+            sim_id:
               type: string
+              description: SIM の一意識別子（ICCID）
             plan_code:
               type: string
 
     ImmediateRechargeRequest:
       type: object
-      required: [plan_code]
+      required: [sim_id, plan_code]
       description: |
-        `iccid` または `sim_id` のいずれか必須。両指定 + 異なる値、または両欠落は 400 を返します。両指定 + 同値は許容。
+        `sim_id` 必須。後方互換のため `iccid` も受け付けます（両指定 + 異なる値は 400）。
       properties:
-        iccid:
-          type: string
-          description: 対象 SIM の ICCID（19-20 桁）
         sim_id:
           type: string
-          description: SIM ID（ICCID のエイリアス）
+          description: 対象 SIM の SIM ID（ICCID、19-20 桁）
+        iccid:
+          type: string
+          description: "（後方互換）対象 SIM の ICCID。`sim_id` の使用を推奨"
+          deprecated: true
         plan_code:
           type: string
           description: 書き換え先プランコード（容量型のみ）
@@ -1147,8 +1152,9 @@ components:
       description: |
         即時リチャージ結果。成功時は `status='Executed'` で `reservation_id` 等が埋まる。
       properties:
-        iccid:
+        sim_id:
           type: string
+          description: SIM の一意識別子（ICCID）
         plan_code:
           type: string
         status:
