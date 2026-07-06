@@ -29,7 +29,30 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ap-northeast-1
       - uses: anthropics/claude-code-action@v1
+        id: claude
         with:
           use_bedrock: "true"
           claude_args: |
             --model global.anthropic.claude-opus-4-6-v1
+
+      - name: Open PR for the created branch
+        if: github.event_name == 'issues' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.claude.outputs.branch_name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          if [ -z "$BRANCH" ]; then
+            echo "No branch created by Claude; skipping PR creation."
+            exit 0
+          fi
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')" ]; then
+            echo "PR already open for $BRANCH; skipping."
+            exit 0
+          fi
+          TITLE=$(gh issue view "$ISSUE_NUMBER" --json title --jq .title)
+          gh pr create \
+            --head "$BRANCH" \
+            --base main \
+            --title "$TITLE" \
+            --body "Closes #$ISSUE_NUMBER"
