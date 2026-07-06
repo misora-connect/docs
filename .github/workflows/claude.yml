@@ -50,6 +50,35 @@ jobs:
               return;
             }
             const { owner, repo } = context.repo;
+
+            // Collect Claude's report from issue comments to use as PR body.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: issueNumber,
+              per_page: 100,
+            });
+            const claudeComments = comments.filter(
+              (c) => c.user && c.user.login === 'claude[bot]' && c.body,
+            );
+            const latestClaude = claudeComments[claudeComments.length - 1];
+            const stripSignature = (body) =>
+              body
+                // Remove the "**Claude finished ...** —— [View job]... • [Create PR ➔](...)" line.
+                .replace(/^\*\*Claude finished[^\n]*\n?/gm, '')
+                // Remove trailing "[View job](...) • [`branch`](...)" style footers.
+                .replace(/\n?\[View job\]\([^)]+\)[^\n]*$/gm, '')
+                // Collapse the horizontal rule left behind after removing the header.
+                .replace(/^---\s*\n/, '')
+                .trim();
+            const reportBody = latestClaude
+              ? stripSignature(latestClaude.body)
+              : '';
+            const prBody = reportBody
+              ? `${reportBody}\n\nCloses #${issueNumber}`
+              : `Closes #${issueNumber}`;
+
+            let pr;
             const { data: existing } = await github.rest.pulls.list({
               owner,
               repo,
@@ -57,20 +86,40 @@ jobs:
               state: 'open',
             });
             if (existing.length > 0) {
-              core.info(`PR already open for ${branch}; skipping.`);
-              return;
+              pr = existing[0];
+              core.info(`PR already open for ${branch}: #${pr.number}`);
+            } else {
+              const { data: issue } = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: issueNumber,
+              });
+              const created = await github.rest.pulls.create({
+                owner,
+                repo,
+                head: branch,
+                base: 'main',
+                title: issue.title,
+                body: prBody,
+              });
+              pr = created.data;
+              core.info(`Created PR #${pr.number}: ${pr.html_url}`);
             }
-            const { data: issue } = await github.rest.issues.get({
-              owner,
-              repo,
-              issue_number: issueNumber,
-            });
-            const { data: pr } = await github.rest.pulls.create({
-              owner,
-              repo,
-              head: branch,
-              base: 'main',
-              title: issue.title,
-              body: `Closes #${issueNumber}`,
-            });
-            core.info(`Created PR #${pr.number}: ${pr.html_url}`);
+
+            // Rewrite Claude's "Create PR ➔" links in this issue's comments
+            // to point at the actual PR that now exists.
+            const replacement = `[PR #${pr.number} ➔](${pr.html_url})`;
+            const createPrLinkPattern = /\[Create PR ➔\]\(https:\/\/github\.com\/[^)]+\)/g;
+            for (const c of comments) {
+              if (!c.body || !createPrLinkPattern.test(c.body)) continue;
+              createPrLinkPattern.lastIndex = 0;
+              const newBody = c.body.replace(createPrLinkPattern, replacement);
+              if (newBody === c.body) continue;
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: c.id,
+                body: newBody,
+              });
+              core.info(`Rewrote Create PR link in comment ${c.id}`);
+            }
