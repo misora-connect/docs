@@ -116,13 +116,14 @@
               <li class="nav-section-title">General</li>
               <li><a href="{{ '/' | relative_url }}" {% if page.url == '/index.html' or page.url == '/' %}class="active"{% endif %}>Home</a></li>
               <li>
-                <details {% if page.url == '/api/index.html' or page.url == '/api/' or page.url == '/api/getting-started.html' or page.url == '/api/user-guide.html' or page.url == '/api/reference.html' %}open{% endif %}>
+                <details {% if page.url == '/api/index.html' or page.url == '/api/' or page.url == '/api/getting-started.html' or page.url == '/api/user-guide.html' or page.url == '/api/reference.html' or page.url contains '/api/spec' %}open{% endif %}>
                   <summary>API</summary>
                   <ul>
                     <li><a href="{{ '/api/' | relative_url }}" {% if page.url == '/api/index.html' or page.url == '/api/' %}class="active"{% endif %}>概要</a></li>
                     <li><a href="{{ '/api/getting-started.html' | relative_url }}" {% if page.url == '/api/getting-started.html' %}class="active"{% endif %}>Getting Started</a></li>
                     <li><a href="{{ '/api/user-guide.html' | relative_url }}" {% if page.url == '/api/user-guide.html' %}class="active"{% endif %}>User Guide</a></li>
                     <li><a href="{{ '/api/reference.html' | relative_url }}" {% if page.url == '/api/reference.html' %}class="active"{% endif %}>API Reference</a></li>
+                    <li><a href="{{ '/api/spec/' | relative_url }}" {% if page.url contains '/api/spec' %}class="active"{% endif %}>OpenAPI Spec</a></li>
                   </ul>
                 </details>
               </li>
