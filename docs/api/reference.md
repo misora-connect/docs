@@ -407,6 +407,53 @@ SIM データのエクスポートをリクエストします。
 
 ---
 
+### GET /v1/recharges/sims/{sim_id}/balance
+
+特定 SIM の現プラン容量（分母）・残り容量・使用量を取得します。マイページ等で「◯GB 中 ◯GB 残り」を描画する用途を想定しています。
+
+**パスパラメータ**
+
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| `sim_id` | string | SIM の一意識別子（ICCID、19-20 桁の数字） |
+
+**レスポンス** `200 OK`
+
+```json
+{
+  "sim_id": "8981080321000912770",
+  "plan_type": "capacity",
+  "total_granted_bytes": 6442450944,
+  "total_remaining_bytes": 5368709120,
+  "used_bytes": 1073741824,
+  "banked_data_bytes": 1073741824,
+  "filler_state": "NORMAL"
+}
+```
+
+**レスポンスフィールド**
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `sim_id` | string | SIM の一意識別子（ICCID） |
+| `plan_type` | string \| null | プランタイプ（`capacity` / `daily`）。プランマスタ未登録時は `null` |
+| `total_granted_bytes` | integer \| null | 付与容量＝現プランで使える総容量（bytes、分母）。capacity プランのみ、それ以外は `null` |
+| `total_remaining_bytes` | integer \| null | 利用可能残量（bytes）。`0 ≤ remaining ≤ total_granted_bytes` にクランプ済み。capacity プランのみ |
+| `used_bytes` | integer \| null | 現プランになってからの使用量（bytes、= `total_granted_bytes − total_remaining_bytes`）。capacity プランのみ |
+| `banked_data_bytes` | integer \| null | Banked Data 残高（bytes）。capacity プランのみ |
+| `filler_state` | string | Filler 状態（`NORMAL` / `FILLER_LARGE` / `FILLER_SMALL`） |
+
+**主要エラー**
+
+| ステータス | 条件 |
+|---|---|
+| 400 | `customer_code` / `sim_id` 未指定、ICCID 形式不正、解約済み SIM |
+| 403 | 指定 SIM を当該顧客が所有していない |
+| 404 | SIM が見つからない |
+| 503 | 累積 usage 取得に失敗（古い値・キャッシュは返さない） |
+
+---
+
 ### GET /v1/recharges/sims/{sim_id}/plans
 
 特定 SIM で利用可能なリチャージプランを取得します。
