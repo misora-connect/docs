@@ -538,6 +538,58 @@ paths:
         "502":
           $ref: "#/components/responses/BadGateway"
 
+  /recharges/sims/{sim_id}/balance:
+    get:
+      tags: [Recharges]
+      summary: SIM 残量取得
+      description: |
+        特定 SIM の現プラン容量（分母）・残り容量・使用量を取得します。
+        マイページ等で「◯GB 中 ◯GB 残り」を描画する用途を想定しています。
+        容量 3 値（`total_granted_bytes` / `total_remaining_bytes` / `used_bytes`）は capacity プランのみ値を持ち、
+        daily プランおよび総枠未確定時（初回リチャージ前・プランマスタ未登録等）は `null` を返します。
+      operationId: getSimBalance
+      parameters:
+        - name: sim_id
+          in: path
+          required: true
+          description: SIM ID（ICCID、19-20 桁の数字）
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RechargeSimBalance"
+              example:
+                sim_id: "8981080321000912770"
+                plan_type: capacity
+                total_granted_bytes: 6442450944
+                total_remaining_bytes: 5368709120
+                used_bytes: 1073741824
+                banked_data_bytes: 1073741824
+                filler_state: NORMAL
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: 指定 SIM を当該顧客が所有していない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "503":
+          description: 累積 usage 取得に失敗（古い値は返さない）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /recharges/sims/{sim_id}/plans:
     get:
       tags: [Recharges]
@@ -1046,6 +1098,41 @@ components:
         next_cursor:
           type: string
           nullable: true
+
+    RechargeSimBalance:
+      type: object
+      description: |
+        SIM の現プラン容量・残量・使用量。容量 3 値は capacity プランのみ値を持ち、
+        daily プランおよび総枠未確定時（初回リチャージ前・プランマスタ未登録等）は `null` を返します。
+      properties:
+        sim_id:
+          type: string
+          description: SIM の一意識別子（ICCID）
+        plan_type:
+          type: string
+          enum: [capacity, daily]
+          nullable: true
+          description: プランタイプ。プランマスタ未登録時は `null`
+        total_granted_bytes:
+          type: integer
+          nullable: true
+          description: 付与容量＝現プランで使える総容量（bytes、分母）。capacity プランのみ
+        total_remaining_bytes:
+          type: integer
+          nullable: true
+          description: 利用可能残量（bytes、分子）。`0 ≤ remaining ≤ total_granted_bytes` にクランプ済み。capacity プランのみ
+        used_bytes:
+          type: integer
+          nullable: true
+          description: 現プランになってからの使用量（bytes、= `total_granted_bytes − total_remaining_bytes`）。capacity プランのみ
+        banked_data_bytes:
+          type: integer
+          nullable: true
+          description: Banked Data 残高（bytes）。capacity プランのみ
+        filler_state:
+          type: string
+          enum: [NORMAL, FILLER_LARGE, FILLER_SMALL]
+          description: Filler 状態。UI が「枯渇」と低速モードを区別する補助情報
 
     Plan:
       type: object
