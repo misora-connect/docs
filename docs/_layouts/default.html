@@ -387,6 +387,9 @@
         color: var(--mc-color-text-primary);
         border: 0;
         font-weight: 700;
+        /* sticky な mc-header の裏に anchor 遷移で隠れないようにオフセット。
+           docs-sidebar の top:88px と揃えて視覚的に一貫させる */
+        scroll-margin-top: 88px;
       }
 
       .markdown-body h1 {
