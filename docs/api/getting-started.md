@@ -48,7 +48,6 @@ print(response.json())
 [
   {
     "sim_id": "sim-001",
-    "customer_code": "110139801",
     "iccid": "8981100000000000001",
     "msisdn": "09012345678",
     "status": "active",
