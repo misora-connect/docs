@@ -8,9 +8,29 @@
   <style>
     body { margin: 0; }
     #swagger-ui .topbar { display: none; }
+    .nav-bar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      padding: 12px 24px;
+      background: #f8f8f8;
+      border-bottom: 1px solid #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+    }
+    .nav-bar a {
+      color: #0366d6;
+      text-decoration: none;
+    }
+    .nav-bar a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
+  <nav class="nav-bar">
+    <a href="../">&larr; API ドキュメントに戻る</a>
+  </nav>
   <div id="swagger-ui"></div>
   <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
   <script>
