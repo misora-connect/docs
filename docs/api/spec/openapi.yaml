@@ -87,6 +87,7 @@ paths:
                   $ref: "#/components/schemas/Sim"
               example:
                 - sim_id: "SIM001"
+                  customer_code: "110139701"
                   iccid: "8981080321000912770"
                   status: active
                   created_at: "2025-01-01T00:00:00Z"
@@ -124,6 +125,7 @@ paths:
                 $ref: "#/components/schemas/SimDetail"
               example:
                 sim_id: "SIM001"
+                customer_code: "110139701"
                 iccid: "8981080321000912770"
                 status: active
                 plan_type: capacity
@@ -205,6 +207,7 @@ paths:
                   $ref: "#/components/schemas/CustomerCumulativeUsage"
               example:
                 - sim_id: "8981080321000912770"
+                  customer_code: "110139701"
                   msisdn: "812001004300889"
                   downlink_bytes: 50000000000
                   uplink_bytes: 15000000000
@@ -325,6 +328,7 @@ paths:
                   $ref: "#/components/schemas/SimMonthlyUsage"
               example:
                 - sim_id: "SIM001"
+                  customer_code: "110139701"
                   year_month: "2026-03"
                   downlink_bytes: 1000000000
                   uplink_bytes: 300000000
@@ -357,6 +361,7 @@ paths:
                   $ref: "#/components/schemas/CdrRecord"
               example:
                 - sim_id: "SIM001"
+                  customer_code: "110139701"
                   record_begins_at: "2026-03-06T10:30:00Z"
                   downlink_bytes: 50000000
                   uplink_bytes: 10000000
@@ -848,6 +853,8 @@ components:
       properties:
         sim_id:
           type: string
+        customer_code:
+          type: string
         iccid:
           type: string
         status:
@@ -897,12 +904,16 @@ components:
           properties:
             sim_id:
               type: string
+            customer_code:
+              type: string
         - $ref: "#/components/schemas/MonthlyUsage"
 
     CdrRecord:
       type: object
       properties:
         sim_id:
+          type: string
+        customer_code:
           type: string
         record_begins_at:
           type: string
@@ -931,6 +942,8 @@ components:
         sim_id:
           type: string
           description: SIM 識別子 (ICCID)
+        customer_code:
+          type: string
         msisdn:
           type: string
         downlink_bytes:
@@ -952,6 +965,8 @@ components:
         sim_id:
           type: string
           description: SIM 識別子 (ICCID)
+        customer_code:
+          type: string
         msisdn:
           type: string
         downlink_bytes:
