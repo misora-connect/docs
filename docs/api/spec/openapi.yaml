@@ -33,7 +33,7 @@ paths:
   /sims:
     get:
       tags: [SIM Management]
-      summary: ListSims
+      summary: ListSims — SIM 一覧取得
       description: 顧客に紐づく SIM のページネーション付き一覧を取得します。
       operationId: ListSims
       parameters:
@@ -100,7 +100,7 @@ paths:
   /sims/{sim_id}:
     get:
       tags: [SIM Management]
-      summary: GetSim
+      summary: GetSim — SIM 詳細取得
       description: 特定の SIM の詳細情報を取得します。
       operationId: GetSim
       parameters:
@@ -139,7 +139,7 @@ paths:
   /sims/summary:
     get:
       tags: [SIM Management]
-      summary: GetSimsSummary
+      summary: GetSimsSummary — SIM サマリー取得
       description: 顧客に紐づく全 SIM の集計サマリー情報を取得します。
       operationId: GetSimsSummary
       parameters:
@@ -163,7 +163,7 @@ paths:
   /stats/sims/monthly_usage:
     get:
       tags: [Statistics]
-      summary: ListMonthlyUsage
+      summary: ListMonthlyUsage — 月次通信量（全 SIM）
       description: 顧客の全 SIM の月次通信量集計データを取得します（直近12ヶ月分）。
       operationId: ListMonthlyUsage
       parameters:
@@ -188,7 +188,7 @@ paths:
   /stats/sims/cumulative_usage:
     get:
       tags: [Statistics]
-      summary: ListCumulativeUsage
+      summary: ListCumulativeUsage — 全 SIM 累積通信量
       description: |
         顧客の全 SIM の累積通信量を一括取得します。概ねリアルタイムで更新されます（最大 5 分のラグがあります）。
 
@@ -235,7 +235,7 @@ paths:
   /stats/sims/current_plan_usage:
     get:
       tags: [Statistics]
-      summary: ListCurrentPlanUsage
+      summary: ListCurrentPlanUsage — 全 SIM 現プラン消費量
       description: |
         顧客の全 SIM の「現プランでの消費量」を一括取得します。
 
@@ -268,7 +268,7 @@ paths:
   /stats/sims/{sim_id}/current_plan_usage:
     get:
       tags: [Statistics]
-      summary: GetSimCurrentPlanUsage
+      summary: GetSimCurrentPlanUsage — SIM 現プラン消費量
       description: |
         特定 SIM の「現プランでの消費量」を取得します。
 
@@ -307,7 +307,7 @@ paths:
   /stats/sims/{sim_id}/monthly_usage:
     get:
       tags: [Statistics]
-      summary: GetSimMonthlyUsage
+      summary: GetSimMonthlyUsage — SIM 別月次通信量
       description: 特定 SIM の月次通信量を取得します（直近12ヶ月分）。
       operationId: GetSimMonthlyUsage
       parameters:
@@ -340,7 +340,7 @@ paths:
   /stats/sims/{sim_id}/details:
     get:
       tags: [Statistics]
-      summary: GetSimUsageDetails
+      summary: GetSimUsageDetails — SIM CDR（通信明細）
       description: 特定 SIM の通信明細（CDR）を取得します。直近 288 件（約24時間分）のレコードが返却されます。
       operationId: GetSimUsageDetails
       parameters:
@@ -374,7 +374,7 @@ paths:
   /stats/sims/{sim_id}/cumulative_usage:
     get:
       tags: [Statistics]
-      summary: GetSimCumulativeUsage
+      summary: GetSimCumulativeUsage — 累積通信量
       description: 特定 SIM の累積通信量を取得します。概ねリアルタイムで更新されます（最大 5 分のラグがあります）。
       operationId: GetSimCumulativeUsage
       parameters:
@@ -406,7 +406,7 @@ paths:
   /exports:
     get:
       tags: [Exports]
-      summary: ListExports
+      summary: ListExports — エクスポート種別一覧
       description: 利用可能なエクスポート種別の一覧を取得します。
       operationId: ListExports
       responses:
@@ -427,7 +427,7 @@ paths:
   /exports/sims:
     post:
       tags: [Exports]
-      summary: CreateSimsExport
+      summary: CreateSimsExport — SIM データエクスポート
       description: |
         SIM データのエクスポートをリクエストします。
 
@@ -488,7 +488,7 @@ paths:
   /recharges/sims:
     get:
       tags: [Recharges]
-      summary: ListRechargeableSims
+      summary: ListRechargeableSims — リチャージ対象 SIM 一覧
       description: リチャージ対象となる SIM の一覧を取得します。各 SIM のリチャージ可否、現在のプラン情報、予約件数が含まれます。
       operationId: ListRechargeableSims
       parameters:
@@ -526,7 +526,7 @@ paths:
   /recharges/sims/{sim_id}/balance:
     get:
       tags: [Recharges]
-      summary: GetSimBalance
+      summary: GetSimBalance — SIM 残量取得
       description: |
         特定 SIM の現プラン容量（分母）・残り容量・使用量を取得します。
         マイページ等で「◯GB 中 ◯GB 残り」を描画する用途を想定しています。
@@ -577,7 +577,7 @@ paths:
   /recharges/sims/{sim_id}/plans:
     get:
       tags: [Recharges]
-      summary: ListSimRechargePlans
+      summary: ListSimRechargePlans — SIM 別リチャージプラン
       description: 特定 SIM の現在のプランに基づいて、利用可能なリチャージプランを取得します。
       operationId: ListSimRechargePlans
       parameters:
@@ -610,7 +610,7 @@ paths:
   /recharges/plans:
     get:
       tags: [Recharges]
-      summary: ListRechargePlans
+      summary: ListRechargePlans — 全リチャージプラン一覧
       description: 顧客が利用可能な全リチャージプランのカタログを取得します。
       operationId: ListRechargePlans
       parameters:
@@ -642,7 +642,7 @@ paths:
   /recharges/plans/{plan_code}:
     get:
       tags: [Recharges]
-      summary: GetRechargePlan
+      summary: GetRechargePlan — プラン詳細
       description: 特定のリチャージプランの詳細情報を取得します。
       operationId: GetRechargePlan
       parameters:
@@ -673,7 +673,7 @@ paths:
   /recharges/reservations:
     get:
       tags: [Recharges]
-      summary: ListRechargeReservations
+      summary: ListRechargeReservations — リチャージ予約一覧
       description: 顧客のリチャージ予約一覧を取得します。SIM ID やステータスでのフィルタリングが可能です。
       operationId: ListRechargeReservations
       parameters:
@@ -714,7 +714,7 @@ paths:
           $ref: "#/components/responses/BadGateway"
     post:
       tags: [Recharges]
-      summary: CreateRechargeReservation
+      summary: CreateRechargeReservation — リチャージ予約作成
       description: SIM に対するリチャージ予約を作成します。1つの SIM に対して最大3件の予約が可能です。
       operationId: CreateRechargeReservation
       parameters:
@@ -749,7 +749,7 @@ paths:
   /recharges/immediate:
     post:
       tags: [Recharges]
-      summary: CreateImmediateRecharge
+      summary: CreateImmediateRecharge — 即時リチャージ（プラン即時書換・残量リセット）
       description: |
         SIM ID とプランコードを指定して、**即時にプラン書換・残量リセット・PCRF 1 回 sync** を実行します。
         容量型プランのみ対象（日次型・CPFR・Internal はエラー）。予約の作成と実行をその場で行い、
