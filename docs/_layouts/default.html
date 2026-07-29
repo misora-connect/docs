@@ -368,6 +368,46 @@
         padding-left: 4px;
       }
 
+      /* TOC（ページ内アンカー） */
+      .docs-toc {
+        list-style: none;
+        padding: 4px 0 0 0;
+        margin: 0;
+        border-left: 2px solid var(--mc-color-border-light);
+        margin-left: 18px;
+      }
+
+      .docs-toc li {
+        margin: 0;
+      }
+
+      .docs-toc a {
+        display: block;
+        padding: 4px 12px;
+        font-size: 12px;
+        font-weight: 400;
+        color: var(--mc-color-text-tertiary);
+        text-decoration: none;
+        border-radius: var(--mc-radius-sm);
+        transition: color 0.15s ease, background 0.15s ease;
+        line-height: 1.4;
+      }
+
+      .docs-toc a:hover {
+        color: var(--mc-color-primary-dark);
+        background-color: var(--mc-color-primary-light);
+        text-decoration: none;
+      }
+
+      .docs-toc a.toc-active {
+        color: var(--mc-color-primary-dark);
+        font-weight: 500;
+      }
+
+      .docs-toc .toc-h3 {
+        padding-left: 24px;
+      }
+
       .docs-content {
         flex: 1;
         min-width: 0;
@@ -741,6 +781,50 @@
           document.documentElement.setAttribute('data-theme', next);
           try { localStorage.setItem('mc-theme', next); } catch (e) { /* ignore */ }
         });
+      })();
+    </script>
+    <script>
+      (function () {
+        var content = document.querySelector('.docs-content');
+        if (!content) return;
+        var headings = content.querySelectorAll('h2[id], h3[id]');
+        if (!headings.length) return;
+
+        var activeLink = document.querySelector('.docs-sidebar a.active');
+        if (!activeLink) return;
+
+        var toc = document.createElement('ul');
+        toc.className = 'docs-toc';
+
+        headings.forEach(function (h) {
+          var li = document.createElement('li');
+          var a = document.createElement('a');
+          a.href = '#' + h.id;
+          a.textContent = h.textContent.replace(/\s*¶$/, '');
+          if (h.tagName === 'H3') a.classList.add('toc-h3');
+          li.appendChild(a);
+          toc.appendChild(li);
+        });
+
+        activeLink.parentNode.insertBefore(toc, activeLink.nextSibling);
+
+        var tocLinks = toc.querySelectorAll('a');
+        var scrollTimeout;
+        function updateActive() {
+          var scrollY = window.scrollY + 100;
+          var current = null;
+          headings.forEach(function (h) {
+            if (h.offsetTop <= scrollY) current = h;
+          });
+          tocLinks.forEach(function (a) {
+            a.classList.toggle('toc-active', current && a.getAttribute('href') === '#' + current.id);
+          });
+        }
+        window.addEventListener('scroll', function () {
+          if (scrollTimeout) cancelAnimationFrame(scrollTimeout);
+          scrollTimeout = requestAnimationFrame(updateActive);
+        });
+        updateActive();
       })();
     </script>
   </body>
