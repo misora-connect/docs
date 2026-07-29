@@ -33,9 +33,9 @@ paths:
   /sims:
     get:
       tags: [SIM Management]
-      summary: SIM 一覧取得
+      summary: ListSims — SIM 一覧取得
       description: 顧客に紐づく SIM のページネーション付き一覧を取得します。
-      operationId: listSims
+      operationId: ListSims
       parameters:
         - name: limit
           in: query
@@ -100,9 +100,9 @@ paths:
   /sims/{sim_id}:
     get:
       tags: [SIM Management]
-      summary: SIM 詳細取得
+      summary: GetSim — SIM 詳細取得
       description: 特定の SIM の詳細情報を取得します。
-      operationId: getSim
+      operationId: GetSim
       parameters:
         - name: sim_id
           in: path
@@ -139,9 +139,9 @@ paths:
   /sims/summary:
     get:
       tags: [SIM Management]
-      summary: SIM サマリー取得
+      summary: GetSimsSummary — SIM サマリー取得
       description: 顧客に紐づく全 SIM の集計サマリー情報を取得します。
-      operationId: getSimSummary
+      operationId: GetSimsSummary
       parameters:
       responses:
         "200":
@@ -163,9 +163,9 @@ paths:
   /stats/sims/monthly_usage:
     get:
       tags: [Statistics]
-      summary: 月次通信量（全 SIM）
+      summary: ListMonthlyUsage — 月次通信量（全 SIM）
       description: 顧客の全 SIM の月次通信量集計データを取得します（直近12ヶ月分）。
-      operationId: getMonthlyUsage
+      operationId: ListMonthlyUsage
       parameters:
       responses:
         "200":
@@ -188,13 +188,13 @@ paths:
   /stats/sims/cumulative_usage:
     get:
       tags: [Statistics]
-      summary: 全 SIM 累積通信量
+      summary: ListCumulativeUsage — 全 SIM 累積通信量
       description: |
         顧客の全 SIM の累積通信量を一括取得します。概ねリアルタイムで更新されます（最大 5 分のラグがあります）。
 
         30,000 件以下の場合は JSON 配列を直接返却します。
         30,000 件を超える場合は S3 にエクスポートし、署名付きダウンロード URL へ 302 リダイレクトします（gzip 圧縮 NDJSON、5分有効）。
-      operationId: getCustomerCumulativeUsage
+      operationId: ListCumulativeUsage
       parameters:
       responses:
         "200":
@@ -235,7 +235,7 @@ paths:
   /stats/sims/current_plan_usage:
     get:
       tags: [Statistics]
-      summary: 全 SIM 現プラン消費量
+      summary: ListCurrentPlanUsage — 全 SIM 現プラン消費量
       description: |
         顧客の全 SIM の「現プランでの消費量」を一括取得します。
 
@@ -243,7 +243,7 @@ paths:
         から最新の Executed リチャージ予約の `usage_offset_bytes` を引いた
         値です。`usage_offset_bytes` が記録されていない SIM では
         `current_plan_used_bytes` は `null` を返します。
-      operationId: getCustomerCurrentPlanUsage
+      operationId: ListCurrentPlanUsage
       parameters:
       responses:
         "200":
@@ -268,7 +268,7 @@ paths:
   /stats/sims/{sim_id}/current_plan_usage:
     get:
       tags: [Statistics]
-      summary: SIM 現プラン消費量
+      summary: GetSimCurrentPlanUsage — SIM 現プラン消費量
       description: |
         特定 SIM の「現プランでの消費量」を取得します。
 
@@ -276,7 +276,7 @@ paths:
         最新の Executed リチャージ予約の `usage_offset_bytes` を引いた
         値です。`usage_offset_bytes` が記録されていない場合は `null` を
         返します。
-      operationId: getSimCurrentPlanUsage
+      operationId: GetSimCurrentPlanUsage
       parameters:
         - name: sim_id
           in: path
@@ -307,9 +307,9 @@ paths:
   /stats/sims/{sim_id}/monthly_usage:
     get:
       tags: [Statistics]
-      summary: SIM 別月次通信量
+      summary: GetSimMonthlyUsage — SIM 別月次通信量
       description: 特定 SIM の月次通信量を取得します（直近12ヶ月分）。
-      operationId: getSimMonthlyUsage
+      operationId: GetSimMonthlyUsage
       parameters:
         - name: sim_id
           in: path
@@ -340,9 +340,9 @@ paths:
   /stats/sims/{sim_id}/details:
     get:
       tags: [Statistics]
-      summary: SIM CDR（通信明細）
+      summary: GetSimUsageDetails — SIM CDR（通信明細）
       description: 特定 SIM の通信明細（CDR）を取得します。直近 288 件（約24時間分）のレコードが返却されます。
-      operationId: getSimDetails
+      operationId: GetSimUsageDetails
       parameters:
         - name: sim_id
           in: path
@@ -374,9 +374,9 @@ paths:
   /stats/sims/{sim_id}/cumulative_usage:
     get:
       tags: [Statistics]
-      summary: 累積通信量
+      summary: GetSimCumulativeUsage — 累積通信量
       description: 特定 SIM の累積通信量を取得します。概ねリアルタイムで更新されます（最大 5 分のラグがあります）。
-      operationId: getSimCumulativeUsage
+      operationId: GetSimCumulativeUsage
       parameters:
         - name: sim_id
           in: path
@@ -406,9 +406,9 @@ paths:
   /exports:
     get:
       tags: [Exports]
-      summary: エクスポート種別一覧
+      summary: ListExports — エクスポート種別一覧
       description: 利用可能なエクスポート種別の一覧を取得します。
-      operationId: listExports
+      operationId: ListExports
       responses:
         "200":
           description: 成功
@@ -427,7 +427,7 @@ paths:
   /exports/sims:
     post:
       tags: [Exports]
-      summary: SIM データエクスポート
+      summary: CreateSimsExport — SIM データエクスポート
       description: |
         SIM データのエクスポートをリクエストします。
 
@@ -435,7 +435,7 @@ paths:
         - **同期モード**: 処理完了まで待機します。
 
         解約済み SIM は除外されます。
-      operationId: createSimExport
+      operationId: CreateSimsExport
       parameters:
         - name: format
           in: query
@@ -488,9 +488,9 @@ paths:
   /recharges/sims:
     get:
       tags: [Recharges]
-      summary: リチャージ対象 SIM 一覧
+      summary: ListRechargeableSims — リチャージ対象 SIM 一覧
       description: リチャージ対象となる SIM の一覧を取得します。各 SIM のリチャージ可否、現在のプラン情報、予約件数が含まれます。
-      operationId: listRechargeSims
+      operationId: ListRechargeableSims
       parameters:
         - $ref: "#/components/parameters/IccidQuery"
         - $ref: "#/components/parameters/SimIdQuery"
@@ -526,13 +526,13 @@ paths:
   /recharges/sims/{sim_id}/balance:
     get:
       tags: [Recharges]
-      summary: SIM 残量取得
+      summary: GetSimBalance — SIM 残量取得
       description: |
         特定 SIM の現プラン容量（分母）・残り容量・使用量を取得します。
         マイページ等で「◯GB 中 ◯GB 残り」を描画する用途を想定しています。
         容量 3 値（`total_granted_bytes` / `total_remaining_bytes` / `used_bytes`）は capacity プランのみ値を持ち、
         daily プランおよび総枠未確定時（初回リチャージ前・プランマスタ未登録等）は `null` を返します。
-      operationId: getSimBalance
+      operationId: GetSimBalance
       parameters:
         - name: sim_id
           in: path
@@ -577,9 +577,9 @@ paths:
   /recharges/sims/{sim_id}/plans:
     get:
       tags: [Recharges]
-      summary: SIM 別リチャージプラン
+      summary: ListSimRechargePlans — SIM 別リチャージプラン
       description: 特定 SIM の現在のプランに基づいて、利用可能なリチャージプランを取得します。
-      operationId: getSimRechargePlans
+      operationId: ListSimRechargePlans
       parameters:
         - name: sim_id
           in: path
@@ -610,9 +610,9 @@ paths:
   /recharges/plans:
     get:
       tags: [Recharges]
-      summary: 全リチャージプラン一覧
+      summary: ListRechargePlans — 全リチャージプラン一覧
       description: 顧客が利用可能な全リチャージプランのカタログを取得します。
-      operationId: listRechargePlans
+      operationId: ListRechargePlans
       parameters:
       responses:
         "200":
@@ -642,9 +642,9 @@ paths:
   /recharges/plans/{plan_code}:
     get:
       tags: [Recharges]
-      summary: プラン詳細
+      summary: GetRechargePlan — プラン詳細
       description: 特定のリチャージプランの詳細情報を取得します。
-      operationId: getRechargePlan
+      operationId: GetRechargePlan
       parameters:
         - name: plan_code
           in: path
@@ -673,9 +673,9 @@ paths:
   /recharges/reservations:
     get:
       tags: [Recharges]
-      summary: リチャージ予約一覧
+      summary: ListRechargeReservations — リチャージ予約一覧
       description: 顧客のリチャージ予約一覧を取得します。SIM ID やステータスでのフィルタリングが可能です。
-      operationId: listReservations
+      operationId: ListRechargeReservations
       parameters:
         - $ref: "#/components/parameters/IccidQuery"
         - $ref: "#/components/parameters/SimIdQuery"
@@ -714,9 +714,9 @@ paths:
           $ref: "#/components/responses/BadGateway"
     post:
       tags: [Recharges]
-      summary: リチャージ予約作成
+      summary: CreateRechargeReservation — リチャージ予約作成
       description: SIM に対するリチャージ予約を作成します。1つの SIM に対して最大3件の予約が可能です。
-      operationId: createReservation
+      operationId: CreateRechargeReservation
       parameters:
       requestBody:
         required: true
@@ -749,7 +749,7 @@ paths:
   /recharges/immediate:
     post:
       tags: [Recharges]
-      summary: 即時リチャージ（プラン即時書換・残量リセット）
+      summary: CreateImmediateRecharge — 即時リチャージ（プラン即時書換・残量リセット）
       description: |
         SIM ID とプランコードを指定して、**即時にプラン書換・残量リセット・PCRF 1 回 sync** を実行します。
         容量型プランのみ対象（日次型・CPFR・Internal はエラー）。予約の作成と実行をその場で行い、
@@ -757,7 +757,7 @@ paths:
 
         `force=true` で既存 `Reserved` 予約を `Cancelled` 化して前倒し実行します。
         PCRF 同期中（`SyncStatus=実行中`）は force 不問で `409 ALREADY_SYNCING`。
-      operationId: immediateRecharge
+      operationId: CreateImmediateRecharge
       parameters:
       requestBody:
         required: true

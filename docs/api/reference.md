@@ -13,7 +13,9 @@ title: API Reference
 
 ## SIMs
 
-### GET /v1/sims
+### ListSims
+
+`GET /v1/sims`
 
 SIM の一覧を取得します。
 
@@ -85,7 +87,9 @@ SIM の一覧を取得します。
 
 ---
 
-### GET /v1/sims/{sim_id}
+### GetSim
+
+`GET /v1/sims/{sim_id}`
 
 特定の SIM の詳細情報を取得します。
 
@@ -107,7 +111,9 @@ SIM オブジェクト（単体）。フィールドは一覧取得と同一で�
 
 ---
 
-### GET /v1/sims/summary
+### GetSimsSummary
+
+`GET /v1/sims/summary`
 
 SIM のステータス別サマリーを取得します。
 
@@ -126,7 +132,9 @@ SIM のステータス別サマリーを取得します。
 
 ## Stats
 
-### GET /v1/stats/sims/monthly_usage
+### ListMonthlyUsage
+
+`GET /v1/stats/sims/monthly_usage`
 
 全 SIM の月別通信量を取得します。
 直近 12 か月分が返ります。
@@ -157,7 +165,9 @@ SIM のステータス別サマリーを取得します。
 
 ---
 
-### GET /v1/stats/sims/{sim_id}/monthly_usage
+### GetSimMonthlyUsage
+
+`GET /v1/stats/sims/{sim_id}/monthly_usage`
 
 特定 SIM の月別通信量を取得します。
 
@@ -173,7 +183,9 @@ SIM のステータス別サマリーを取得します。
 
 ---
 
-### GET /v1/stats/sims/{sim_id}/details
+### GetSimUsageDetails
+
+`GET /v1/stats/sims/{sim_id}/details`
 
 特定 SIM の 5 分間隔の詳細通信量（CDR データ）を取得します。
 最大 288 レコード（約 24 時間分）が返ります。
@@ -230,7 +242,9 @@ SIM のステータス別サマリーを取得します。
 
 ---
 
-### GET /v1/stats/sims/cumulative_usage
+### ListCumulativeUsage
+
+`GET /v1/stats/sims/cumulative_usage`
 
 全 SIM の累積通信量を取得します。
 
@@ -261,7 +275,9 @@ SIM のステータス別サマリーを取得します。
 
 ---
 
-### GET /v1/stats/sims/{sim_id}/cumulative_usage
+### GetSimCumulativeUsage
+
+`GET /v1/stats/sims/{sim_id}/cumulative_usage`
 
 特定 SIM の累積通信量を取得します。
 
@@ -285,7 +301,9 @@ SIM のステータス別サマリーを取得します。
 
 ## Exports
 
-### GET /v1/exports
+### ListExports
+
+`GET /v1/exports`
 
 利用可能なエクスポート種別の一覧を取得します。
 
@@ -299,7 +317,9 @@ SIM のステータス別サマリーを取得します。
 
 ---
 
-### POST /v1/exports/sims
+### CreateSimsExport
+
+`POST /v1/exports/sims`
 
 SIM データのエクスポートをリクエストします。
 解約済み SIM はエクスポートに含まれません。
@@ -351,7 +371,9 @@ SIM データのエクスポートをリクエストします。
 
 ## Recharges
 
-### GET /v1/recharges/sims
+### ListRechargeableSims
+
+`GET /v1/recharges/sims`
 
 リチャージ可能な SIM の一覧を取得します。
 
@@ -407,7 +429,9 @@ SIM データのエクスポートをリクエストします。
 
 ---
 
-### GET /v1/recharges/sims/{sim_id}/balance
+### GetSimBalance
+
+`GET /v1/recharges/sims/{sim_id}/balance`
 
 特定 SIM の現プラン容量（分母）・残り容量・使用量を取得します。マイページ等で「◯GB 中 ◯GB 残り」を描画する用途を想定しています。
 
@@ -454,7 +478,9 @@ SIM データのエクスポートをリクエストします。
 
 ---
 
-### GET /v1/recharges/sims/{sim_id}/plans
+### ListSimRechargePlans
+
+`GET /v1/recharges/sims/{sim_id}/plans`
 
 特定 SIM で利用可能なリチャージプランを取得します。
 
@@ -483,7 +509,9 @@ SIM データのエクスポートをリクエストします。
 
 ---
 
-### GET /v1/recharges/plans
+### ListRechargePlans
+
+`GET /v1/recharges/plans`
 
 利用可能な全リチャージプランを取得します。
 
@@ -493,7 +521,9 @@ SIM データのエクスポートをリクエストします。
 
 ---
 
-### GET /v1/recharges/plans/{plan_code}
+### GetRechargePlan
+
+`GET /v1/recharges/plans/{plan_code}`
 
 特定のリチャージプランの詳細を取得します。
 
@@ -527,7 +557,9 @@ SIM データのエクスポートをリクエストします。
 
 ---
 
-### POST /v1/recharges/reservations
+### CreateRechargeReservation
+
+`POST /v1/recharges/reservations`
 
 リチャージの予約を作成します。
 
@@ -589,7 +621,9 @@ SIM データのエクスポートをリクエストします。
 
 ---
 
-### GET /v1/recharges/reservations
+### ListRechargeReservations
+
+`GET /v1/recharges/reservations`
 
 リチャージ予約の一覧を取得します。
 
