@@ -29,8 +29,12 @@ jobs:
         id: claude
         with:
           use_bedrock: "true"
+          # ephemeral runner のイメージに焼き込んだ Claude Code を使い、
+          # 毎ジョブ約 110 秒かかっていたインストールをスキップする。
+          # container ラベルの runner 専用。
+          path_to_claude_code_executable: /home/runner/.local/bin/claude
           claude_args: |
-            --model global.anthropic.claude-opus-4-6-v1
+            --model global.anthropic.claude-opus-5
 
       - name: Generate GitHub App token for PR creation
         if: github.event_name == 'issues' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null)
