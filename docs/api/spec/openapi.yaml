@@ -715,7 +715,17 @@ paths:
     post:
       tags: [Recharges]
       summary: CreateRechargeReservation — リチャージ予約作成
-      description: SIM に対するリチャージ予約を作成します。1つの SIM に対して最大3件の予約が可能です。
+      description: |
+        SIM に対するリチャージ予約を作成します。1 つの SIM に対して最大 3 件の予約が可能です。
+
+        **実行タイミング** — 予約したリチャージが実際に適用されるタイミングはプランタイプによって異なります。
+
+        - `capacity`（容量上限型）：残データ量が 500MB 未満になった時点、または利用終了日の 21:00（JST）以降
+        - `daily`（日次上限型）：利用終了日に到達後、毎日 20:00（JST）の日次処理で実行（残データ量による判定なし）
+
+        ※ 上限が 500MB 以下の小容量プランでは、上限に到達した時点で実行されます。
+
+        予約直後は `status` が `reserved` となり、実行後に `executed` へ変わります。
       operationId: CreateRechargeReservation
       parameters:
       requestBody:
