@@ -299,6 +299,99 @@ SIM のステータス別サマリーを取得します。
 
 ---
 
+### ListCurrentPlanUsage
+
+`GET /v1/stats/sims/current_plan_usage`
+
+全 SIM の「現プランでの消費量」を取得します。
+
+累積通信量（`total_bytes`）が SIM の生涯通算であるのに対し、`current_plan_used_bytes` は最新の実行済みリチャージ以降に使った量です。「今のプランであとどれだけ使えるか」を知りたい場合はこちらを参照してください。
+
+**レスポンス** `200 OK`
+
+```json
+[
+  {
+    "sim_id": "8981100000000000001",
+    "customer_code": "110139801",
+    "msisdn": "09012345678",
+    "downlink_bytes": 10737418240,
+    "uplink_bytes": 2684354560,
+    "total_bytes": 13421772800,
+    "checked_at": "2026-06-16T00:00:00Z",
+    "latest_record_time": "2026-06-16T00:00:00Z",
+    "plan_code": "OI071522",
+    "plan_started_at": "2026-06-10T01:00:00Z",
+    "usage_offset_bytes": 10737418240,
+    "current_plan_used_bytes": 2684354560
+  }
+]
+```
+
+---
+
+### GetSimCurrentPlanUsage
+
+`GET /v1/stats/sims/{sim_id}/current_plan_usage`
+
+特定 SIM の「現プランでの消費量」を取得します。レスポンスは要素 1 件の配列です。
+
+**パスパラメータ**
+
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| `sim_id` | string | SIM の一意識別子 |
+
+**レスポンス** `200 OK`
+
+```json
+[
+  {
+    "sim_id": "8981100000000000001",
+    "customer_code": "110139801",
+    "msisdn": "09012345678",
+    "downlink_bytes": 10737418240,
+    "uplink_bytes": 2684354560,
+    "total_bytes": 13421772800,
+    "checked_at": "2026-06-16T00:00:00Z",
+    "latest_record_time": "2026-06-16T00:00:00Z",
+    "plan_code": "OI071522",
+    "plan_started_at": "2026-06-10T01:00:00Z",
+    "usage_offset_bytes": 10737418240,
+    "current_plan_used_bytes": 2684354560
+  }
+]
+```
+
+**レスポンスフィールド**
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `sim_id` | string | SIM の一意識別子（ICCID） |
+| `customer_code` | string | 顧客コード |
+| `msisdn` | string | 電話番号 |
+| `downlink_bytes` | integer | 累積下り通信量（bytes） |
+| `uplink_bytes` | integer | 累積上り通信量（bytes） |
+| `total_bytes` | integer | 累積通信量（bytes、生涯通算） |
+| `checked_at` | string | 集計時刻 |
+| `latest_record_time` | string | 集計に含まれる最新レコードの時刻 |
+| `plan_code` | string \| null | 現プランのプランコード（最新の実行済みリチャージ予約のもの） |
+| `plan_started_at` | string \| null | 現プランの開始時刻（最新の実行済みリチャージ予約の実行日時） |
+| `usage_offset_bytes` | integer \| null | 現プラン適用時点の累積通信量 |
+| `current_plan_used_bytes` | integer \| null | 現プランでの消費量（bytes、= `total_bytes − usage_offset_bytes`） |
+
+`usage_offset_bytes` が記録されていない SIM では、`plan_code` / `plan_started_at` / `usage_offset_bytes` / `current_plan_used_bytes` が `null` になります。一度もリチャージを実行していない SIM が該当します。
+
+**主要エラー**
+
+| ステータス | 条件 |
+|---|---|
+| 400 | `sim_id` の形式が不正 |
+| 404 | 指定 SIM の利用実績データが存在しない |
+| 503 | 集計基盤が一時的に利用できない |
+
+---
+
 ## Exports
 
 ### ListExports
@@ -667,6 +760,77 @@ SIM データのエクスポートをリクエストします。
 | `status` | string | ステータス。`reserved`（予約済み）/ `executed`（実行済み）/ `failed`（失敗） |
 | `reserved_at` | string | 予約日時（ISO 8601） |
 | `executed_at` | string\|null | 実行日時（ISO 8601） |
+
+---
+
+### CreateImmediateRecharge
+
+`POST /v1/recharges/immediate`
+
+プランの書き換えと残量リセットを、予約を挟まずその場で実行します。予約レコードは作成と同時に `Executed` になります。
+
+容量上限型（`capacity`）のプランのみが対象です。日次上限型プラン、CPFR プラン、社内専用プランを指定した場合はエラーになります。
+
+**リクエストボディ**
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `sim_id` | string | ○ | 対象 SIM の一意識別子（ICCID、19-20 桁の数字） |
+| `plan_code` | string | ○ | 書き換え先のプランコード（容量上限型のみ） |
+| `force` | boolean | | `true` のとき、既存の予約済みリチャージを取り消して前倒し実行します。既定値は `false` |
+
+```json
+{
+  "sim_id": "8981080301011327143",
+  "plan_code": "OI071522",
+  "force": false
+}
+```
+
+**レスポンス** `200 OK`
+
+```json
+{
+  "sim_id": "8981080301011327143",
+  "plan_code": "OI071522",
+  "status": "Executed",
+  "reservation_id": "a1XRB000005P7Q12AK",
+  "sync_status": "実行中",
+  "superseded_reservation_ids": [],
+  "error_code": null,
+  "message": "Immediate recharge executed. PCRF sync triggered."
+}
+```
+
+**レスポンスフィールド**
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `sim_id` | string | SIM の一意識別子（ICCID） |
+| `plan_code` | string | 書き換え先のプランコード |
+| `status` | string \| null | 予約ステータス。成功時は `Executed` |
+| `reservation_id` | string \| null | 生成された予約 ID |
+| `sync_status` | string \| null | ネットワーク側への反映状況。成功直後は `実行中` で、反映完了後に `実行済` へ変わります |
+| `superseded_reservation_ids` | array | `force` により取り消した既存予約の ID |
+| `error_code` | string \| null | エラーコード（成功時は `null`） |
+| `message` | string | 処理結果メッセージ |
+
+**主要エラー**
+
+| ステータス | `error_code` | 条件 |
+|---|---|---|
+| 400 | `INVALID_REQUEST` | 必須項目が不足している |
+| 400 | `INVALID_ICCID` | `sim_id` が未指定、または ICCID の形式が不正 |
+| 400 | `INVALID_PLAN` | プランコードが不正、解約済み SIM、日次上限型 / CPFR / 社内専用プランを指定した |
+| 400 | `REALM_MISMATCH` | SIM とプランの接続先ネットワークが一致しない |
+| 403 | `FORBIDDEN_TENANT` | 指定 SIM を当該顧客が所有していない |
+| 404 | `NOT_FOUND` | SIM が見つからない |
+| 409 | `ALREADY_SYNCING` | ネットワーク側へ反映中。`force` を指定しても実行できません |
+| 409 | `RESERVATION_EXISTS` | 実行待ちの予約が存在する。`force=true` で前倒し実行できます |
+| 500 | `EXECUTION_FAILED` | 実行処理に失敗した |
+| 503 | `USAGE_UNAVAILABLE` | 通信量の取得に失敗した（プランは書き換えていません） |
+
+`ALREADY_SYNCING` は `force` の指定によらず発生します。直前の書き換えがネットワークへ反映されるまで待ってから再試行してください。
 
 ---
 

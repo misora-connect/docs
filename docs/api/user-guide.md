@@ -137,6 +137,44 @@ curl -H "x-api-key: YOUR_API_KEY" \
 レコード数が 30,000 件を超える場合、レスポンスは `302` リダイレクトとなり、S3 の署名付き URL（gzip 圧縮 NDJSON、有効期限 5 分）へ転送されます。
 HTTP クライアントがリダイレクトに自動追従する設定になっているか、あらかじめ確認してください。
 
+### 現プランでの消費量
+
+累積通信量が SIM の生涯通算であるのに対し、`current_plan_usage` は「最新の実行済みリチャージ以降に使った量」を返します。
+「今のプランであとどれだけ使えるか」を知りたい場合はこちらを使います。
+
+#### 個別 SIM の現プラン消費量
+
+```bash
+curl -H "x-api-key: YOUR_API_KEY" \
+  "https://api.misora-connect.com/v1/stats/sims/8981100000000000001/current_plan_usage"
+```
+
+```json
+[
+  {
+    "sim_id": "8981100000000000001",
+    "total_bytes": 13421772800,
+    "plan_code": "OI071522",
+    "plan_started_at": "2026-06-10T01:00:00Z",
+    "usage_offset_bytes": 10737418240,
+    "current_plan_used_bytes": 2684354560
+  }
+]
+```
+
+`current_plan_used_bytes` は `total_bytes − usage_offset_bytes` で求まります。
+`usage_offset_bytes` は現プランが適用された時点の累積通信量です。
+
+#### 全 SIM の現プラン消費量
+
+```bash
+curl -H "x-api-key: YOUR_API_KEY" \
+  "https://api.misora-connect.com/v1/stats/sims/current_plan_usage"
+```
+
+一度もリチャージを実行していない SIM では、`plan_code` や `current_plan_used_bytes` が `null` になります。
+残量をそのまま画面に出す用途では、リチャージ側の残量取得 API（後述の「残量の確認」）のほうが扱いやすい場合があります。
+
 ## データエクスポート
 
 ### エクスポート可能なデータ
@@ -246,6 +284,37 @@ curl -H "x-api-key: YOUR_API_KEY" \
 カーソルベースのページネーションに対応しています。
 `has_more` が `true` の場合、`next_cursor` の値を `cursor` パラメータに指定して次のページを取得します。
 
+### 残量の確認
+
+`GET /v1/recharges/sims/{sim_id}/balance` で、現プランの総容量・残量・使用量をまとめて取得します。
+マイページ等で「◯GB 中 ◯GB 残り」を描画する用途を想定した API です。
+
+```bash
+curl -H "x-api-key: YOUR_API_KEY" \
+  "https://api.misora-connect.com/v1/recharges/sims/8981100000000000001/balance"
+```
+
+```json
+{
+  "sim_id": "8981100000000000001",
+  "plan_type": "capacity",
+  "total_granted_bytes": 6442450944,
+  "total_remaining_bytes": 5368709120,
+  "used_bytes": 1073741824,
+  "banked_data_bytes": 1073741824,
+  "filler_state": "NORMAL"
+}
+```
+
+`total_granted_bytes` が分母、`total_remaining_bytes` が分子です。
+残量は `0 ≤ total_remaining_bytes ≤ total_granted_bytes` の範囲にクランプ済みなので、そのまま表示に使えます。
+
+容量 3 値（`total_granted_bytes` / `total_remaining_bytes` / `used_bytes`）は容量上限型プランでのみ値を持ちます。
+日次上限型プランの SIM、および総枠が未確定の SIM（初回リチャージ前など）では `null` が返るため、
+表示側で「残量非表示」に切り替える分岐を用意してください。
+
+通信量の取得に失敗した場合は `503` を返します。古い値やキャッシュを返すことはありません。
+
 ### リチャージプランの確認
 
 #### 特定 SIM で利用可能なプラン
@@ -333,6 +402,63 @@ curl -H "x-api-key: YOUR_API_KEY" \
 curl -H "x-api-key: YOUR_API_KEY" \
   "https://api.misora-connect.com/v1/recharges/reservations?sim_id=8981100000000000001&status=executed"
 ```
+
+### 即時リチャージ
+
+`POST /v1/recharges/immediate` は、予約を挟まずにその場でプランを書き換えます。
+残量は書き換えと同時にリセットされ、予約は作成と同時に実行済みになります。
+
+通常のリチャージは「残量が少なくなったら適用する」予約方式です。
+即時リチャージは残量の有無を問わず**その時点で現プランを置き換える**ため、
+残っていたデータ量はリセットされます。運用ツールからの手動操作や、
+利用者の求めに応じてその場で容量を追加する用途を想定しています。
+
+対象は容量上限型（`capacity`）プランのみです。
+日次上限型プラン、CPFR プラン、社内専用プランは指定できません。
+
+```bash
+curl -X POST -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sim_id": "8981100000000000001", "plan_code": "PLAN-001"}' \
+  "https://api.misora-connect.com/v1/recharges/immediate"
+```
+
+```json
+{
+  "sim_id": "8981100000000000001",
+  "plan_code": "PLAN-001",
+  "status": "Executed",
+  "reservation_id": "rsv-001",
+  "sync_status": "実行中",
+  "superseded_reservation_ids": [],
+  "error_code": null,
+  "message": "Immediate recharge executed. PCRF sync triggered."
+}
+```
+
+成功直後の `sync_status` は `実行中` です。
+ネットワーク側への反映が完了すると `実行済` に変わります。
+
+#### 実行待ちの予約がある場合
+
+対象 SIM に実行待ちの予約が残っていると `409 RESERVATION_EXISTS` になります。
+既存の予約を取り消して前倒し実行する場合は `force` を指定してください。
+取り消した予約の ID は `superseded_reservation_ids` に入ります。
+
+```bash
+curl -X POST -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sim_id": "8981100000000000001", "plan_code": "PLAN-001", "force": true}' \
+  "https://api.misora-connect.com/v1/recharges/immediate"
+```
+
+#### 連続実行時の注意
+
+直前の書き換えがネットワークへ反映されている間は `409 ALREADY_SYNCING` を返します。
+これは `force` を指定しても回避できません。`sync_status` が `実行済` になるのを待ってから再試行してください。
+
+なお `503 USAGE_UNAVAILABLE`（通信量の取得失敗）が返った場合、プランの書き換えは行われていません。
+そのまま再試行して問題ありません。
 
 ## 共通仕様
 
