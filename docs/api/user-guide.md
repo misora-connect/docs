@@ -367,7 +367,7 @@ curl -X POST -H "x-api-key: YOUR_API_KEY" \
 ```json
 {
   "reservation_id": "rsv-001",
-  "status": "reserved",
+  "status": "Reserved",
   "reserved_at": "2026-06-16T10:00:00Z"
 }
 ```
@@ -383,7 +383,7 @@ curl -X POST -H "x-api-key: YOUR_API_KEY" \
 
 ※ 上限が 500MB 以下の小容量プランでは、上限に到達した時点で実行されます。
 
-予約直後は `status` が `reserved` となり、実行後に `executed` へ変わります。
+予約直後は `status` が `Reserved` となり、実行後に `Executed` へ変わります。
 
 ### 予約一覧の確認
 
@@ -395,12 +395,12 @@ curl -H "x-api-key: YOUR_API_KEY" \
 次のフィルタリングオプションを利用できます。
 
 - `sim_id`：特定 SIM の予約のみに絞り込みます。
-- `status`：ステータスで絞り込みます（`reserved`、`executed`、`failed`）。
+- `status`：ステータスで絞り込みます（`Reserved`、`Executed`、`Failed`）。値は大文字始まりで指定してください。小文字を指定すると `400` になります。
 
 ```bash
 # 特定 SIM の実行済み予約のみ
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/recharges/reservations?sim_id=8981100000000000001&status=executed"
+  "https://api.misora-connect.com/v1/recharges/reservations?sim_id=8981100000000000001&status=Executed"
 ```
 
 ### 即時リチャージ

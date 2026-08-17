@@ -675,7 +675,7 @@ SIM データのエクスポートをリクエストします。
 ```json
 {
   "reservation_id": "rsv-001",
-  "status": "reserved",
+  "status": "Reserved",
   "reserved_at": "2026-06-16T10:00:00Z"
 }
 ```
@@ -710,7 +710,7 @@ SIM データのエクスポートをリクエストします。
 
 ※ 上限が 500MB 以下の小容量プランでは、上限に到達した時点で実行されます。
 
-予約直後は `status` が `reserved` となり、実行後に `executed` へ変わります。
+予約直後は `status` が `Reserved` となり、実行後に `Executed` へ変わります。
 
 ---
 
@@ -725,7 +725,7 @@ SIM データのエクスポートをリクエストします。
 | パラメータ | 型 | 必須 | デフォルト | 説明 |
 |---|---|---|---|---|
 | `sim_id` | string | No | - | 特定 SIM でフィルタ |
-| `status` | string | No | - | ステータスでフィルタ。`reserved` / `executed` / `failed` |
+| `status` | string | No | - | ステータスでフィルタ。`Reserved` / `Executed` / `Failed`。値が一致しない場合は `400` |
 | `page_size` | integer | No | 200 | 1ページあたりの件数 |
 | `cursor` | string | No | - | ページネーションカーソル |
 
@@ -738,7 +738,7 @@ SIM データのエクスポートをリクエストします。
       "reservation_id": "rsv-001",
       "sim_id": "8981100000000000001",
       "plan_code": "PLAN-001",
-      "status": "executed",
+      "status": "Executed",
       "reserved_at": "2026-06-16T10:00:00Z",
       "executed_at": "2026-06-16T10:05:00Z"
     }
@@ -757,7 +757,7 @@ SIM データのエクスポートをリクエストします。
 | `reservation_id` | string | 予約 ID |
 | `sim_id` | string | SIM の一意識別子（ICCID） |
 | `plan_code` | string | プランコード |
-| `status` | string | ステータス。`reserved`（予約済み）/ `executed`（実行済み）/ `failed`（失敗） |
+| `status` | string | ステータス。`Reserved`（予約済み）/ `Executed`（実行済み）/ `Failed`（失敗） |
 | `reserved_at` | string | 予約日時（ISO 8601） |
 | `executed_at` | string\|null | 実行日時（ISO 8601） |
 
