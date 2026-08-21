@@ -142,7 +142,6 @@ paths:
       summary: GetSimsSummary — SIM サマリー取得
       description: 顧客に紐づく全 SIM の集計サマリー情報を取得します。
       operationId: GetSimsSummary
-      parameters:
       responses:
         "200":
           description: 成功
@@ -166,7 +165,6 @@ paths:
       summary: ListMonthlyUsage — 月次通信量（全 SIM）
       description: 顧客の全 SIM の月次通信量集計データを取得します（直近12ヶ月分）。
       operationId: ListMonthlyUsage
-      parameters:
       responses:
         "200":
           description: 成功
@@ -195,7 +193,6 @@ paths:
         30,000 件以下の場合は JSON 配列を直接返却します。
         30,000 件を超える場合は S3 にエクスポートし、署名付きダウンロード URL へ 302 リダイレクトします（gzip 圧縮 NDJSON、5分有効）。
       operationId: ListCumulativeUsage
-      parameters:
       responses:
         "200":
           description: 成功（30,000 件以下）
@@ -244,7 +241,6 @@ paths:
         値です。`usage_offset_bytes` が記録されていない SIM では
         `current_plan_used_bytes` は `null` を返します。
       operationId: ListCurrentPlanUsage
-      parameters:
       responses:
         "200":
           description: 成功
@@ -613,7 +609,6 @@ paths:
       summary: ListRechargePlans — 全リチャージプラン一覧
       description: 顧客が利用可能な全リチャージプランのカタログを取得します。
       operationId: ListRechargePlans
-      parameters:
       responses:
         "200":
           description: 成功
@@ -727,7 +722,6 @@ paths:
 
         予約直後は `status` が `reserved` となり、実行後に `executed` へ変わります。
       operationId: CreateRechargeReservation
-      parameters:
       requestBody:
         required: true
         content:
@@ -768,7 +762,6 @@ paths:
         `force=true` で既存 `Reserved` 予約を `Cancelled` 化して前倒し実行します。
         PCRF 同期中（`SyncStatus=実行中`）は force 不問で `409 ALREADY_SYNCING`。
       operationId: CreateImmediateRecharge
-      parameters:
       requestBody:
         required: true
         content:
