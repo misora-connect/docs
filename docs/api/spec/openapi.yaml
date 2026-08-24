@@ -175,7 +175,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/MonthlyUsage"
               example:
-                - year_month: "2026-03"
+                - year_month: "202603"
                   downlink_bytes: 1500000000
                   uplink_bytes: 500000000
         "400":
@@ -325,7 +325,7 @@ paths:
               example:
                 - sim_id: "SIM001"
                   customer_code: "110139701"
-                  year_month: "2026-03"
+                  year_month: "202603"
                   downlink_bytes: 1000000000
                   uplink_bytes: 300000000
         "400":
@@ -895,7 +895,7 @@ components:
       properties:
         year_month:
           type: string
-          example: "2026-03"
+          example: "202603"
         downlink_bytes:
           type: integer
         uplink_bytes:

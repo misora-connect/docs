@@ -146,22 +146,18 @@ SIM のステータス別サマリーを取得します。
   {
     "year_month": "202606",
     "downlink_bytes": 1073741824,
-    "uplink_bytes": 268435456,
-    "plan_name": "plan-s",
-    "last_updated_at": "2026-06-16T00:00:00Z"
+    "uplink_bytes": 268435456
   }
 ]
 ```
 
-**月別通信量オブジェクトのフィールド**
+**集計月別通信量オブジェクトのフィールド**
 
 | フィールド | 型 | 説明 |
 |---|---|---|
 | `year_month` | string | 年月（`YYYYMM` 形式） |
-| `downlink_bytes` | integer | 下り通信量（バイト） |
-| `uplink_bytes` | integer | 上り通信量（バイト） |
-| `plan_name` | string | プラン名 |
-| `last_updated_at` | string | 最終更新日時（ISO 8601） |
+| `downlink_bytes` | integer | 下り通信量の合計（バイト、SUM 集計） |
+| `uplink_bytes` | integer | 上り通信量の合計（バイト、SUM 集計） |
 
 ---
 
@@ -179,7 +175,37 @@ SIM のステータス別サマリーを取得します。
 
 **レスポンス** `200 OK`
 
-月別通信量オブジェクトの配列（フィールドは全 SIM 版と同一）。
+```json
+[
+  {
+    "sim_id": "sim-001",
+    "customer_code": "110139801",
+    "operator_id": "op-001",
+    "imsi": "440101234567890",
+    "msisdn": "09012345678",
+    "year_month": "202606",
+    "plan_name": "plan-s",
+    "downlink_bytes": 1073741824,
+    "uplink_bytes": 268435456,
+    "last_updated_at": "2026-06-16T00:00:00Z"
+  }
+]
+```
+
+**SIM 別月別通信量オブジェクトのフィールド**
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `sim_id` | string | SIM の一意識別子 |
+| `customer_code` | string | 顧客コード |
+| `operator_id` | string | オペレーター識別子 |
+| `imsi` | string | IMSI |
+| `msisdn` | string | MSISDN |
+| `year_month` | string | 年月（`YYYYMM` 形式） |
+| `plan_name` | string | プラン名 |
+| `downlink_bytes` | integer | 下り通信量（バイト） |
+| `uplink_bytes` | integer | 上り通信量（バイト） |
+| `last_updated_at` | string | 最終更新日時（ISO 8601） |
 
 ---
 
