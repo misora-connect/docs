@@ -18,9 +18,9 @@ jobs:
     if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, colima]
     env:
-      PREVIEW_BUCKET: misora-docs-preview
-      PREVIEW_PREFIX: docs-pr-${{ github.event.number }}
-      PREVIEW_URL: https://docs-pr-${{ github.event.number }}.dev.misora-connect.com
+      PREVIEW_BUCKET: misora-preview
+      PREVIEW_PREFIX: ${{ github.event.repository.name }}/pr-${{ github.event.number }}
+      PREVIEW_URL: https://${{ github.event.repository.name }}-pr-${{ github.event.number }}.preview.misora-connect.com
       CF_DISTRIBUTION_ID: E1Q5BADE38XP60
     steps:
       - name: Clean up Docker-generated files
@@ -85,8 +85,8 @@ jobs:
     if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, colima]
     env:
-      PREVIEW_BUCKET: misora-docs-preview
-      PREVIEW_PREFIX: docs-pr-${{ github.event.number }}
+      PREVIEW_BUCKET: misora-preview
+      PREVIEW_PREFIX: ${{ github.event.repository.name }}/pr-${{ github.event.number }}
     steps:
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
