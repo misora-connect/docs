@@ -297,7 +297,7 @@ SIM のステータス別サマリーを取得します。
 
 レコード数が 30,000 件以上の場合:
 
-`302 Found` を返し、S3 の署名付き URL（gzip 圧縮 NDJSON、有効期限 5 分）へリダイレクトします。
+`302 Found` を返し、S3 の署名付きダウンロード URL（NDJSON、`Content-Type: application/x-ndjson`、有効期限 5 分）へリダイレクトします。実体は gzip 圧縮されており、S3 側で `Content-Encoding: gzip` を付与するため、`curl --compressed` / requests / ブラウザなど標準的な HTTP クライアントは自動的に解凍します（自前で gunzip する必要はありません）。
 
 ---
 
