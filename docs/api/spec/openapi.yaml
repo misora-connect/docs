@@ -676,10 +676,13 @@ paths:
         - $ref: "#/components/parameters/SimIdQuery"
         - name: status
           in: query
-          description: ステータスでフィルタ
+          description: |
+            ステータスでフィルタ。大文字始まりの値のみ受け付けます（小文字を指定すると 400）。
+            応答の `status` にはこのほか `Cancelled`（取り消し済み）が入る場合がありますが、
+            フィルタ値としては指定できません。
           schema:
             type: string
-            enum: [reserved, executed, failed]
+            enum: [Reserved, Executed, Failed]
         - $ref: "#/components/parameters/PageSize"
         - $ref: "#/components/parameters/Cursor"
       responses:
@@ -720,7 +723,21 @@ paths:
 
         ※ 上限が 500MB 以下の小容量プランでは、上限に到達した時点で実行されます。
 
-        予約直後は `status` が `reserved` となり、実行後に `executed` へ変わります。
+        予約直後は `status` が `Reserved` となり、実行後に `Executed` へ変わります。
+
+        **予約できない条件** — 以下に該当する場合は予約が作成されず、`errorCode` 付きのエラーになります。
+
+        | HTTP | errorCode | 条件 |
+        |---|---|---|
+        | 400 | `BAD_REQUEST` | 必須項目の不足 / SIM ID の形式不正（19-20 桁の数字）/ 存在しない・無効な `plan_code` / 解約済み SIM（`SIM is terminated`）/ リチャージ対象外プラン |
+        | 400 | `LIMIT_EXCEEDED` | 未実行（`Reserved`）の予約が上限 3 件に到達している |
+        | 400 | `PLAN_MISMATCH` | 容量上限型と日次上限型の混在 / 日次上限型で 1 日あたり容量・リセット周期が現行プランと不一致 |
+        | 400 | `REALM_MISMATCH` | プランのレルムが SIM の現行レルムと不一致（通信断防止のため拒否） |
+        | 403 | `FORBIDDEN` | 指定 SIM を当該顧客が所有していない |
+        | 404 | `NOT_FOUND` | 指定 SIM が登録されていない |
+
+        予約上限にカウントされるのは `status` が `Reserved` の予約のみです。`Executed` や取り消し済みの
+        予約は含まないため、3 件予約済みでもそのうち 1 件が実行されれば次の予約を作成できます。
       operationId: CreateRechargeReservation
       requestBody:
         required: true
@@ -740,11 +757,12 @@ paths:
                 $ref: "#/components/schemas/Reservation"
               example:
                 reservation_id: "RR-00012"
-                status: 予約済み
+                status: Reserved
                 reserved_at: "2026-03-10T10:30:00Z"
-                executed_at: null
         "400":
           $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "502":
@@ -1159,19 +1177,21 @@ components:
 
     Reservation:
       type: object
+      description: |
+        予約作成（`POST /recharges/reservations`）の応答。`executed_at` は含まれません。
       properties:
         reservation_id:
           type: string
+          description: 予約 ID（`RR-00012` 形式）
         status:
           type: string
+          description: |
+            予約ステータス。`Reserved`（予約済み）/ `Executed`（実行済み）/
+            `Failed`（失敗）/ `Cancelled`（取り消し済み）。作成直後は `Reserved`
+          enum: [Reserved, Executed, Failed, Cancelled]
         reserved_at:
           type: string
           format: date-time
-        executed_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: 実行日時（未実行時 null）
 
     ReservationDetail:
       allOf:
@@ -1183,6 +1203,11 @@ components:
               description: SIM の一意識別子（ICCID）
             plan_code:
               type: string
+            executed_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: 実行日時（未実行時 null）
 
     ImmediateRechargeRequest:
       type: object
@@ -1260,6 +1285,8 @@ components:
     # ----- Common -----
     Error:
       type: object
+      description: |
+        エラー応答。`detail` の中の `errorCode` / `message` はキャメルケースです。
       properties:
         detail:
           oneOf:
@@ -1268,12 +1295,26 @@ components:
               properties:
                 errorCode:
                   type: string
+                  description: |
+                    エラーコード。`BAD_REQUEST`（汎用の入力・状態エラー）/
+                    `LIMIT_EXCEEDED`（予約上限到達）/ `PLAN_MISMATCH`（プラン不整合）/
+                    `REALM_MISMATCH`（レルム不整合）/ `FORBIDDEN`（権限なし）/
+                    `NOT_FOUND`（対象なし）/ `VALIDATION_ERROR`（リクエストボディ不正）
                 message:
                   type: string
+                  description: |
+                    エラーの詳細。同じ `errorCode` でも条件により内容が異なります
+                    （例: 解約済み SIM への予約は `BAD_REQUEST` + `SIM is terminated`）
 
   responses:
     BadRequest:
       description: バリデーションエラー
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: 指定リソースへのアクセス権限がない
       content:
         application/json:
           schema:

@@ -700,19 +700,33 @@ SIM データのエクスポートをリクエストします。
 
 ```json
 {
-  "reservation_id": "rsv-001",
+  "reservation_id": "RR-00012",
   "status": "Reserved",
   "reserved_at": "2026-06-16T10:00:00Z"
 }
 ```
 
+`executed_at` は予約作成の応答には含まれません。実行日時は `GET /v1/recharges/reservations` で取得してください。
+
+#### 予約できる件数
+
+1 つの SIM に対して予約できるのは **最大 3 件** です。上限にカウントされるのは `status` が
+`Reserved`（未実行）の予約のみで、`Executed`（実行済み）や取り消し済みの予約は含みません。
+
+そのため「通算 4 件目」ではなく「未実行の予約が同時に 4 件になる」タイミングで
+`LIMIT_EXCEEDED` になります。3 件予約済みでも、そのうち 1 件が実行されれば次の予約を作成できます。
+
 **エラーレスポンス**
 
-| ステータス | 条件 |
-|---|---|
-| `400` | 必須フィールドの不足、不正な SIM ID やプランコード |
-| `403` | アクセス権限なし |
-| `502` | 下流サービスのエラー |
+| ステータス | `errorCode` | 条件 |
+|---|---|---|
+| `400` | `BAD_REQUEST` | 必須フィールドの不足、不正な SIM ID やプランコード、解約済み SIM、リチャージ対象外プラン |
+| `400` | `LIMIT_EXCEEDED` | 未実行の予約が上限（3 件）に到達している |
+| `400` | `PLAN_MISMATCH` | 容量上限型と日次上限型の混在、または日次上限型で 1 日あたり容量・リセット周期が現行プランと不一致 |
+| `400` | `REALM_MISMATCH` | プランのレルムが SIM の現行レルムと不一致 |
+| `403` | `FORBIDDEN` | アクセス権限なし |
+| `404` | `NOT_FOUND` | 指定した SIM が登録されていない |
+| `502` | - | 下流サービスのエラー |
 
 リチャージサービスのエラーレスポンスは次の形式です。
 
@@ -720,10 +734,21 @@ SIM データのエクスポートをリクエストします。
 {
   "detail": {
     "errorCode": "FORBIDDEN",
-    "message": "Access denied for the specified resource"
+    "message": "Customer does not have permission for this ICCID"
   }
 }
 ```
+
+`errorCode` が `BAD_REQUEST` になる条件は複数あるため、条件の切り分けには `message` を参照してください。
+主なものは次のとおりです。
+
+| `message` | 条件 |
+|---|---|
+| `iccid is required` / `planCode is required` | 必須フィールドの不足 |
+| `Invalid ICCID format` | SIM ID が 19-20 桁の数字でない |
+| `Invalid planCode` | 存在しない、または有効期限切れのプランコード |
+| `SIM is terminated` | 解約済みの SIM を指定した |
+| `CPFR plans are not eligible for recharge` | リチャージ対象外のプラン（定額・容量無制限）を指定した |
 
 #### リチャージの実行タイミング
 
@@ -751,7 +776,7 @@ SIM データのエクスポートをリクエストします。
 | パラメータ | 型 | 必須 | デフォルト | 説明 |
 |---|---|---|---|---|
 | `sim_id` | string | No | - | 特定 SIM でフィルタ |
-| `status` | string | No | - | ステータスでフィルタ。`Reserved` / `Executed` / `Failed`。値が一致しない場合は `400` |
+| `status` | string | No | - | ステータスでフィルタ。`Reserved` / `Executed` / `Failed`。大文字始まりのみ有効で、値が一致しない場合は `400`。`Cancelled` はフィルタ値として指定できません |
 | `page_size` | integer | No | 200 | 1ページあたりの件数 |
 | `cursor` | string | No | - | ページネーションカーソル |
 
@@ -783,7 +808,7 @@ SIM データのエクスポートをリクエストします。
 | `reservation_id` | string | 予約 ID |
 | `sim_id` | string | SIM の一意識別子（ICCID） |
 | `plan_code` | string | プランコード |
-| `status` | string | ステータス。`Reserved`（予約済み）/ `Executed`（実行済み）/ `Failed`（失敗） |
+| `status` | string | ステータス。`Reserved`（予約済み）/ `Executed`（実行済み）/ `Failed`（失敗）/ `Cancelled`（取り消し済み） |
 | `reserved_at` | string | 予約日時（ISO 8601） |
 | `executed_at` | string\|null | 実行日時（ISO 8601） |
 
