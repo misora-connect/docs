@@ -552,7 +552,13 @@ SIM データのエクスポートをリクエストします。
 
 `GET /v1/recharges/sims/{sim_id}/balance`
 
-特定 SIM の現プラン容量（分母）・残り容量・使用量を取得します。マイページ等で「◯GB 中 ◯GB 残り」を描画する用途を想定しています。
+特定 SIM の使える総量・残り容量・使用量を取得します。マイページ等で「◯GB 中 ◯GB 残り」を描画する用途を想定しています。
+
+**繰越（Banked Data）の扱い**
+
+- 使える総量 = 現プラン容量 + 繰越（未消化分 = Banked Data）
+- 消費順序は 現プラン → 繰越。現プランの枯渇または期間満了時に、繰越分は自動的に払い出されます（お客様の操作は不要で、通信は途切れません）。したがって残量は現プランと繰越をまたいで連続して減ります
+- 繰越は無期限ではなく、払い出し用の内部プランの期間終了時に消滅します
 
 **パスパラメータ**
 
@@ -570,7 +576,9 @@ SIM データのエクスポートをリクエストします。
   "total_remaining_bytes": 5368709120,
   "used_bytes": 1073741824,
   "banked_data_bytes": 1073741824,
-  "filler_state": "NORMAL"
+  "filler_state": "NORMAL",
+  "checked_at": "2026-08-26T05:30:00Z",
+  "latest_record_time": "2026-08-25T15:00:00Z"
 }
 ```
 
@@ -580,11 +588,13 @@ SIM データのエクスポートをリクエストします。
 |---|---|---|
 | `sim_id` | string | SIM の一意識別子（ICCID） |
 | `plan_type` | string \| null | プランタイプ（`capacity` / `daily`）。プランマスタ未登録時は `null` |
-| `total_granted_bytes` | integer \| null | 付与容量＝現プランで使える総容量（bytes、分母）。capacity プランのみ、それ以外は `null` |
-| `total_remaining_bytes` | integer \| null | 利用可能残量（bytes）。`0 ≤ remaining ≤ total_granted_bytes` にクランプ済み。capacity プランのみ |
-| `used_bytes` | integer \| null | 現プランになってからの使用量（bytes、= `total_granted_bytes − total_remaining_bytes`）。capacity プランのみ |
-| `banked_data_bytes` | integer \| null | Banked Data 残高（bytes）。capacity プランのみ |
+| `total_granted_bytes` | integer \| null | 付与容量（bytes）＝「◯GB 中 ◯GB 残り」の**前者**。**現プラン容量 + 繰越（Banked Data）の合計**。capacity プランのみ、それ以外は `null` |
+| `total_remaining_bytes` | integer \| null | 利用可能残量（bytes）＝「◯GB 中 ◯GB 残り」の**後者**。**繰越分を含みます**。サーバ側で `0 ≤ remaining ≤ total_granted_bytes` および `used = granted − remaining` の整合を保証するため、**利用者側での追加補正は不要**です。capacity プランのみ |
+| `used_bytes` | integer \| null | 使用量（bytes、= `total_granted_bytes − total_remaining_bytes`）。capacity プランのみ |
+| `banked_data_bytes` | integer \| null | 繰越（未消化データ）残高（bytes）。**`total_granted_bytes` / `total_remaining_bytes` に既に含まれる内訳であり、加算しないでください**。繰越の払い出し中（`filler_state != NORMAL`）は 0 になりますが、総枠・残量は繰越分を含んだままなので表示は不連続になりません。capacity プランのみ |
 | `filler_state` | string | Filler 状態（`NORMAL` / `FILLER_LARGE` / `FILLER_SMALL`） |
+| `checked_at` | string | 残量を確認した時刻（UTC、RFC 3339 / `...Z` 形式） |
+| `latest_record_time` | string \| null | 残量算出に使った使用量データの最新記録時刻（UTC、RFC 3339 / `...Z` 形式）。通信実績が無い SIM や、使用量を参照しないプラン（daily 等）では `null` |
 
 **主要エラー**
 
