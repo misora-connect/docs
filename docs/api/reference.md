@@ -560,6 +560,14 @@ SIM データのエクスポートをリクエストします。
 - 消費順序は 現プラン → 繰越。現プランの枯渇または期間満了時に、繰越分は自動的に払い出されます（お客様の操作は不要で、通信は途切れません）。したがって残量は現プランと繰越をまたいで連続して減ります
 - 繰越は無期限ではなく、払い出し用の内部プランの期間終了時に消滅します
 
+**daily プラン（1GB/day 等）の当日枠**
+
+- 通算残量の概念を持たないため容量 3 値は `null` のまま、当日枠を `daily_limit_bytes` / `daily_used_bytes` / `daily_remaining_bytes` で返します
+- 当日利用量は**日本時間の 0:00 以降**の実績の合計です。日付が変わると 0 に戻ります
+- 日次上限のないプラン（無制限）や、リセット周期が 1 日でないプランでは上限・残量が `null` になり、**当日利用量のみ**を返します
+
+レスポンスは全プランタイプで同一のスキーマです。capacity プランでは `daily_*` が、daily プランでは容量 3 値が、それぞれ `null` として含まれます。
+
 **パスパラメータ**
 
 | パラメータ | 型 | 説明 |
@@ -567,6 +575,8 @@ SIM データのエクスポートをリクエストします。
 | `sim_id` | string | SIM の一意識別子（ICCID、19-20 桁の数字） |
 
 **レスポンス** `200 OK`
+
+capacity プラン（容量型）:
 
 ```json
 {
@@ -578,7 +588,29 @@ SIM データのエクスポートをリクエストします。
   "banked_data_bytes": 1073741824,
   "filler_state": "NORMAL",
   "checked_at": "2026-08-26T05:30:00Z",
-  "latest_record_time": "2026-08-25T15:00:00Z"
+  "latest_record_time": "2026-08-25T15:00:00Z",
+  "daily_limit_bytes": null,
+  "daily_used_bytes": null,
+  "daily_remaining_bytes": null
+}
+```
+
+daily プラン（日次型・1GB/day）:
+
+```json
+{
+  "sim_id": "8981080321000912788",
+  "plan_type": "daily",
+  "total_granted_bytes": null,
+  "total_remaining_bytes": null,
+  "used_bytes": null,
+  "banked_data_bytes": null,
+  "filler_state": "NORMAL",
+  "checked_at": "2026-09-03T05:30:00Z",
+  "latest_record_time": "2026-09-03T05:18:00Z",
+  "daily_limit_bytes": 1073741824,
+  "daily_used_bytes": 268435456,
+  "daily_remaining_bytes": 805306368
 }
 ```
 
@@ -594,7 +626,10 @@ SIM データのエクスポートをリクエストします。
 | `banked_data_bytes` | integer \| null | 繰越（未消化データ）残高（bytes）。**`total_granted_bytes` / `total_remaining_bytes` に既に含まれる内訳であり、加算しないでください**。繰越の払い出し中（`filler_state != NORMAL`）は 0 になりますが、総枠・残量は繰越分を含んだままなので表示は不連続になりません。capacity プランのみ |
 | `filler_state` | string | Filler 状態（`NORMAL` / `FILLER_LARGE` / `FILLER_SMALL`） |
 | `checked_at` | string | 残量を確認した時刻（UTC、RFC 3339 / `...Z` 形式） |
-| `latest_record_time` | string \| null | 残量算出に使った使用量データの最新記録時刻（UTC、RFC 3339 / `...Z` 形式）。通信実績が無い SIM や、使用量を参照しないプラン（daily 等）では `null` |
+| `latest_record_time` | string \| null | 残量算出に使った使用量データの最新記録時刻（UTC、RFC 3339 / `...Z` 形式）。通信実績が無い SIM や、使用量を参照しない状態（総枠未確定など）では `null`。daily プランでは当日分の集計に使った最新実績の時刻を返します |
+| `daily_limit_bytes` | integer \| null | 1 日あたりの上限（bytes）。**daily プランのみ**。日次上限のないプラン（無制限）、リセット周期が 1 日でないプラン、およびプラン情報から上限を判定できない場合は `null` |
+| `daily_used_bytes` | integer \| null | 当日利用量（bytes）。**日本時間 0:00 以降**の実績の合計で、日付が変わると 0 に戻ります。**daily プランのみ**。通信実績が無い SIM は `0` |
+| `daily_remaining_bytes` | integer \| null | 当日残量（bytes）＝ `daily_limit_bytes − daily_used_bytes`（0 未満にはなりません）。**daily プランのみ**。`daily_limit_bytes` が `null` の場合は `null` |
 
 **主要エラー**
 
