@@ -543,6 +543,11 @@ paths:
 
         レスポンスは全プランタイプで同一のスキーマです。capacity プランでは `daily_*` が、
         daily プランでは容量 3 値が、それぞれ `null` として含まれます。
+
+        **解約済み SIM**: 残量は返さず `400`（`errorCode: BAD_REQUEST` / `message: SIM is terminated`）になります。
+        `GET /v1/sims` で `include_terminated=true` を指定して取得した SIM や、解約直後で一覧にまだ残っている SIM に
+        対して本 API を呼ぶとこの応答になります。解約済み SIM はリチャージ対象外のため、`GET /v1/recharges/sims`
+        の一覧には含まれません。
       operationId: GetSimBalance
       parameters:
         - name: sim_id
@@ -590,7 +595,28 @@ paths:
                     daily_used_bytes: 268435456
                     daily_remaining_bytes: 805306368
         "400":
-          $ref: "#/components/responses/BadRequest"
+          description: |
+            バリデーションエラー。`detail.message` で原因を判別できます。
+
+            - `Invalid ICCID format` — ICCID が 19-20 桁の数字でない
+            - `SIM is terminated` — 解約済み SIM（残量は返しません）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                terminated:
+                  summary: 解約済み SIM
+                  value:
+                    detail:
+                      errorCode: BAD_REQUEST
+                      message: SIM is terminated
+                invalidIccid:
+                  summary: ICCID 形式不正
+                  value:
+                    detail:
+                      errorCode: BAD_REQUEST
+                      message: Invalid ICCID format
         "403":
           description: 指定 SIM を当該顧客が所有していない
           content:
