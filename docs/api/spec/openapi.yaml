@@ -7,11 +7,6 @@ info:
     ## Authentication
     全てのリクエストに `x-api-key` ヘッダが必要です。
 
-    ## Customer Code
-    顧客スコープは認証情報（API Key / トークン）から決まります。`customer_code`（9桁数字）は省略可能で、省略時は認証情報に紐づく顧客コードが自動的に使用されます。
-
-    明示的に指定する場合は、認証情報のスコープと一致している必要があります。異なる顧客コードを指定したリクエストは `403` で拒否されます（指定が無視されて別のデータが返ることはありません）。
-
     ## レスポンス形式
     全て JSON 形式で返却されます。日時は ISO 8601 形式（`YYYY-MM-DDTHH:MM:SSZ`）です。
   version: "1.0"
@@ -53,7 +48,6 @@ paths:
         件数だけが必要な場合は `GET /v1/sims/count` を使用してください。
       operationId: ListSims
       parameters:
-        - $ref: "#/components/parameters/CustomerCode"
         - name: limit
           in: query
           description: 取得件数（最大 1000）
@@ -160,7 +154,6 @@ paths:
           description: SIM 識別子
           schema:
             type: string
-        - $ref: "#/components/parameters/CustomerCode"
         - name: filter_nulls
           in: query
           description: |
@@ -224,7 +217,6 @@ paths:
         絞り込みの条件・意味論は `GET /v1/sims` と共通です。
       operationId: CountSims
       parameters:
-        - $ref: "#/components/parameters/CustomerCode"
         - name: include_terminated
           in: query
           description: |
@@ -246,10 +238,6 @@ paths:
                 count: 113683
         "400":
           $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
 
   /sims/summary:
     get:
@@ -257,8 +245,6 @@ paths:
       summary: SIM サマリー取得
       description: 顧客に紐づく全 SIM の集計サマリー情報を取得します。
       operationId: GetSimsSummary
-      parameters:
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -288,8 +274,6 @@ paths:
       summary: 月次通信量（全 SIM）
       description: 顧客の全 SIM の月次通信量集計データを取得します（直近12ヶ月分、year_month 降順）。
       operationId: ListMonthlyUsage
-      parameters:
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -318,8 +302,6 @@ paths:
         30,000 件以下の場合は JSON 配列を直接返却します。
         30,000 件を超える場合は S3 にエクスポートし、署名付きダウンロード URL へ 302 リダイレクトします（NDJSON、`Content-Type: application/x-ndjson`、5分有効）。実体は gzip 圧縮されており、S3 側で `Content-Encoding: gzip` を付与するため、`curl --compressed` / requests / ブラウザなど標準的な HTTP クライアントは自動的に解凍します。
       operationId: ListCumulativeUsage
-      parameters:
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功（30,000 件以下）
@@ -368,8 +350,6 @@ paths:
         値です。`usage_offset_bytes` が記録されていない SIM では
         `current_plan_used_bytes` は `null` を返します。
       operationId: ListCurrentPlanUsage
-      parameters:
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -409,7 +389,6 @@ paths:
           description: SIM 識別子
           schema:
             type: string
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -443,7 +422,6 @@ paths:
           description: SIM 識別子
           schema:
             type: string
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -477,7 +455,6 @@ paths:
           description: SIM 識別子
           schema:
             type: string
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -512,7 +489,6 @@ paths:
           description: SIM 識別子
           schema:
             type: string
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -566,7 +542,6 @@ paths:
         解約済み SIM は除外されます。
       operationId: CreateSimsExport
       parameters:
-        - $ref: "#/components/parameters/CustomerCode"
         - name: format
           in: query
           description: 出力形式
@@ -622,7 +597,6 @@ paths:
       description: リチャージ対象となる SIM の一覧を取得します。各 SIM のリチャージ可否、現在のプラン情報、予約件数が含まれます。
       operationId: ListRechargeableSims
       parameters:
-        - $ref: "#/components/parameters/CustomerCode"
         - $ref: "#/components/parameters/IccidQuery"
         - $ref: "#/components/parameters/SimIdQuery"
         - $ref: "#/components/parameters/PageSize"
@@ -671,7 +645,6 @@ paths:
           description: SIM ID（ICCID、19-20 桁の数字）
           schema:
             type: string
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -689,8 +662,6 @@ paths:
                 filler_state: NORMAL
         "400":
           $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
         "403":
           description: 指定 SIM を当該顧客が所有していない
           content:
@@ -721,7 +692,6 @@ paths:
           description: SIM ID（ICCID）
           schema:
             type: string
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -748,8 +718,6 @@ paths:
       summary: 全リチャージプラン一覧
       description: 顧客が利用可能な全リチャージプランのカタログを取得します。
       operationId: ListRechargePlans
-      parameters:
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -788,7 +756,6 @@ paths:
           description: プラン識別子
           schema:
             type: string
-        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -814,7 +781,6 @@ paths:
       description: 顧客のリチャージ予約一覧を取得します。ICCID / SIM ID やステータスでのフィルタリングが可能です。
       operationId: ListRechargeReservations
       parameters:
-        - $ref: "#/components/parameters/CustomerCode"
         - $ref: "#/components/parameters/IccidQuery"
         - $ref: "#/components/parameters/SimIdQuery"
         - name: status
@@ -865,8 +831,6 @@ paths:
 
         予約直後は `status` が `reserved` となり、実行後に `executed` へ変わります。
       operationId: CreateRechargeReservation
-      parameters:
-        - $ref: "#/components/parameters/CustomerCode"
       requestBody:
         required: true
         content:
@@ -907,8 +871,6 @@ paths:
         `force=true` で既存 `Reserved` 予約を `Cancelled` 化して前倒し実行します。
         PCRF 同期中（`SyncStatus=実行中`）は force 不問で `409 ALREADY_SYNCING`。
       operationId: CreateImmediateRecharge
-      parameters:
-        - $ref: "#/components/parameters/CustomerCode"
       requestBody:
         required: true
         content:
@@ -969,16 +931,6 @@ components:
       description: API Key
 
   parameters:
-    CustomerCode:
-      name: customer_code
-      in: query
-      description: |
-        9桁の顧客コード。省略時は認証情報に紐づく顧客コードを使用します。
-        指定する場合は認証情報のスコープと一致している必要があり、不一致の場合は 403 を返します。
-      schema:
-        type: string
-        pattern: '^\d{9}$'
-        example: "110139701"
     PageSize:
       name: page_size
       in: query
@@ -1675,20 +1627,6 @@ components:
   responses:
     BadRequest:
       description: バリデーションエラー
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
-    Unauthorized:
-      description: 認可情報が伴わないリクエスト
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
-    Forbidden:
-      description: |
-        認証スコープ外の要求。
-        `customer_code` に認証情報と異なる顧客コードを指定した場合、または認証情報に顧客スコープが無い場合。
       content:
         application/json:
           schema:
