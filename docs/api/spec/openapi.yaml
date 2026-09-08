@@ -7,6 +7,11 @@ info:
     ## Authentication
     全てのリクエストに `x-api-key` ヘッダが必要です。
 
+    ## Customer Code
+    顧客スコープは認証情報（API Key / トークン）から決まります。`customer_code`（9桁数字）は省略可能で、省略時は認証情報に紐づく顧客コードが自動的に使用されます。
+
+    明示的に指定する場合は、認証情報のスコープと一致している必要があります。異なる顧客コードを指定したリクエストは `403` で拒否されます（指定が無視されて別のデータが返ることはありません）。
+
     ## レスポンス形式
     全て JSON 形式で返却されます。日時は ISO 8601 形式（`YYYY-MM-DDTHH:MM:SSZ`）です。
   version: "1.0"
@@ -33,10 +38,23 @@ paths:
   /sims:
     get:
       tags: [SIM Management]
-      summary: ListSims — SIM 一覧取得
-      description: 顧客に紐づく SIM のページネーション付き一覧を取得します。
+      summary: SIM 一覧取得
+      description: |
+        顧客に紐づく SIM のページネーション付き一覧を取得します。
+
+        **母集団**: 既定（`include_terminated=false`）では `status <> 'terminated'` が対象です。
+        在庫（`stock`）・停止（`inactive`）も含まれます。`include_terminated=true` では
+        解約済みを含む全行が対象です。
+
+        ⚠️ この絞り込みは `status` の値に基づくため、**Salesforce 側で解約済みでも
+        `active` / `inactive` に分類された行は除外されません**（CASE の評価順が原因。#28）。
+
+        **行数について**: 応答は `mc_sims` ビューの行で、SIM の枚数と一致しないことがあります。
+        同一 SIM が複数行に増幅する既知の問題があるためです（本番実測で約 0.3%）。
+        件数だけが必要な場合は `GET /v1/sims/count` を使用してください。
       operationId: ListSims
       parameters:
+        - $ref: "#/components/parameters/CustomerCode"
         - name: limit
           in: query
           description: 取得件数（最大 1000）
@@ -56,7 +74,7 @@ paths:
           schema:
             type: string
             default: sim_id
-            enum: [sim_id, status, created_at, updated_at]
+            enum: [sim_id, customer_code, status]
         - name: order_direction
           in: query
           description: ソート方向
@@ -66,13 +84,23 @@ paths:
             enum: [asc, desc]
         - name: include_terminated
           in: query
-          description: 解約済み SIM を含めるか
+          description: |
+            `true`: 解約済み SIM を**含む全件**を返す / `false`: 解約済み SIM を除外する。
+
+            ⚠️ 2026-09 以前は `true` が「解約済み**のみ**」を返す排他的な切り替えでした。
+            `true` と `false` の 2 回呼びで全件を合成していた場合は `true` 1 回に置き換えてください
+            （そのままだと二重計上になります）。
           schema:
             type: boolean
             default: false
+        - $ref: "#/components/parameters/SimIdPrefixFilter"
+        - $ref: "#/components/parameters/MsisdnPrefixFilter"
         - name: filter_nulls
           in: query
-          description: null フィールドを除外するか
+          description: |
+            `true`（既定）のとき、値が null のフィールドを **キーごと応答から除外** します
+            （`null` として返るのではありません）。`false` にすると全フィールドが返り、
+            値の無いものは `null` になります。
           schema:
             type: boolean
             default: true
@@ -86,12 +114,35 @@ paths:
                 items:
                   $ref: "#/components/schemas/Sim"
               example:
-                - sim_id: "SIM001"
-                  customer_code: "110139701"
-                  iccid: "8981080321000912770"
-                  status: active
-                  created_at: "2025-01-01T00:00:00Z"
-                  updated_at: "2026-01-01T00:00:00Z"
+                - sim_id: "8981080000000012345"
+                  customer_code: "110000001"
+                  application_start_date: "2026-01-06"
+                  carrier_opening_date: "2026-01-06"
+                  communication_generation: "4G"
+                  dns_primary: "192.0.2.53"
+                  dns_secondary: "192.0.2.54"
+                  imsi: "440090000000001"
+                  ip_address: "192.0.2.1"
+                  ip_address_type: "動的IP"
+                  ipv6_address_dns_primary: ""
+                  ipv6_address_dns_secondary: ""
+                  ipv6_address: ""
+                  line_category: "フルMVNO(Ph2.1)"
+                  line_status_from_mc: "開通"
+                  lines_status: "開通"
+                  opening_date: "2026-01-06"
+                  msisdn: "812000000000001"
+                  realm: "example.invalid"
+                  service_category: "データ"
+                  shipping_date: "2026-01-06"
+                  apn: "example.invalid"
+                  active_plan_name: "5GB/月 ライト/フル 制限時256kbps"
+                  product_name: "5GB/月 ライト/フル 制限時256kbps"
+                  sim_category: "マルチSIM"
+                  product_name_id: "5GB/月 ライト/フル 制限時256kbps"
+                  status: "ready"
+                  session_status: "online"
+                  session_created_at: "2026-08-18 22:54:11"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -100,8 +151,11 @@ paths:
   /sims/{sim_id}:
     get:
       tags: [SIM Management]
-      summary: GetSim — SIM 詳細取得
-      description: 特定の SIM の詳細情報を取得します。
+      summary: SIM 詳細取得
+      description: |
+        特定の SIM の詳細情報を取得します。
+
+        応答のフィールドは `GET /v1/sims` と同一です（同じ `Sim` スキーマ）。
       operationId: GetSim
       parameters:
         - name: sim_id
@@ -110,9 +164,13 @@ paths:
           description: SIM 識別子
           schema:
             type: string
+        - $ref: "#/components/parameters/CustomerCode"
         - name: filter_nulls
           in: query
-          description: null フィールドを除外するか
+          description: |
+            `true`（既定）のとき、値が null のフィールドを **キーごと応答から除外** します
+            （`null` として返るのではありません）。`false` にすると全フィールドが返り、
+            値の無いものは `null` になります。
           schema:
             type: boolean
             default: true
@@ -122,26 +180,91 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SimDetail"
+                $ref: "#/components/schemas/Sim"
               example:
-                sim_id: "SIM001"
-                customer_code: "110139701"
-                iccid: "8981080321000912770"
-                status: active
-                plan_type: capacity
-                created_at: "2025-01-01T00:00:00Z"
-                updated_at: "2026-01-01T00:00:00Z"
+                sim_id: "8981080000000012345"
+                customer_code: "110000001"
+                application_start_date: "2026-01-06"
+                carrier_opening_date: "2026-01-06"
+                communication_generation: "4G"
+                dns_primary: "192.0.2.53"
+                dns_secondary: "192.0.2.54"
+                imsi: "440090000000001"
+                ip_address: "192.0.2.1"
+                ip_address_type: "動的IP"
+                ipv6_address_dns_primary: ""
+                ipv6_address_dns_secondary: ""
+                ipv6_address: ""
+                line_category: "フルMVNO(Ph2.1)"
+                line_status_from_mc: "開通"
+                lines_status: "開通"
+                opening_date: "2026-01-06"
+                msisdn: "812000000000001"
+                realm: "example.invalid"
+                service_category: "データ"
+                shipping_date: "2026-01-06"
+                apn: "example.invalid"
+                active_plan_name: "5GB/月 ライト/フル 制限時256kbps"
+                product_name: "5GB/月 ライト/フル 制限時256kbps"
+                sim_category: "マルチSIM"
+                product_name_id: "5GB/月 ライト/フル 制限時256kbps"
+                status: "ready"
+                session_status: "online"
+                session_created_at: "2026-08-18 22:54:11"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /sims/count:
+    get:
+      tags: [SIM Management]
+      summary: SIM 件数取得
+      description: |
+        `GET /v1/sims` と同じ絞り込みに一致する行数を返します。
+        一覧のフィルタ時件数表示や、CSV エクスポートへ誘導するかの判定に使用します。
+
+        件数は `mc_sims` ビューの**行数**であり、SIM の枚数とは一致しません。
+        絞り込みの条件・意味論は `GET /v1/sims` と共通です。
+      operationId: CountSims
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+        - name: include_terminated
+          in: query
+          description: |
+            `true`: 解約済み SIM を**含む全件**を数える / `false`: 解約済み SIM を除外する。
+
+            ⚠️ 2026-09 以前は `true` が「解約済み**のみ**」を数える排他的な切り替えでした。
+            `true` と `false` の 2 回呼びで全件を合算していた場合は `true` 1 回に置き換えてください。
+          schema:
+            type: boolean
+            default: false
+        - $ref: "#/components/parameters/SimIdPrefixFilter"
+        - $ref: "#/components/parameters/MsisdnPrefixFilter"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimCount"
+              example:
+                count: 113683
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /sims/summary:
     get:
       tags: [SIM Management]
-      summary: GetSimsSummary — SIM サマリー取得
+      summary: SIM サマリー取得
       description: 顧客に紐づく全 SIM の集計サマリー情報を取得します。
       operationId: GetSimsSummary
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -150,9 +273,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/SimSummary"
               example:
-                total_sims: 150
-                active_sims: 142
-                suspended_sims: 8
+                customer_code: "110139701"
+                total: 439
+                subscribed: 426
+                ready: 330
+                active: 2
+                online: 16
+                terminated: 13
+                unknown: 94
+                updated_at: "2026-08-12T15:04:31Z"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -162,12 +291,19 @@ paths:
   /stats/sims/monthly_usage:
     get:
       tags: [Statistics]
-      summary: ListMonthlyUsage — 月次通信量（全 SIM）
-      description: 顧客の全 SIM の月次通信量集計データを取得します（直近12ヶ月分）。
+      summary: 月次通信量（全 SIM）
+      description: |
+        顧客の全 SIM の月次通信量集計データを取得します（直近12ヶ月分、year_month 降順）。
+
+        SIM 再発行が発生した月に Salesforce が作る**合計行（旧 + 新の合算行）は集計から除外**されます（旧SIM 行と新SIM 行はそれぞれ合算されます）。除外しないと再発行月は二重計上になります。詳細は `/v1/stats/sims/monthly_usage_by_sim` の `reissue_category` を参照してください。
+
+        該当データが無い場合は空配列 `[]` を返します（200）。
       operationId: ListMonthlyUsage
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
-          description: 成功
+          description: 成功（該当なしは空配列 `[]`）
           content:
             application/json:
               schema:
@@ -180,19 +316,86 @@ paths:
                   uplink_bytes: 500000000
         "400":
           $ref: "#/components/responses/BadRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
+
+  /stats/sims/monthly_usage_by_sim:
+    get:
+      tags: [Statistics]
+      summary: 月次通信量（指定月・SIM 別内訳）
+      description: |
+        指定月に**利用実績のある SIM のみ**の通信量内訳を返します（`sim_id` 昇順）。通信のない契約中 SIM は含まれません。
+
+        ⚠️ **本 EP は `合計行`（SIM 再発行月の 旧 + 新の合算行）を含みます**。単純合計すると再発行月は二重計上になるため、集計する場合は `reissue_category='total'` の行を除外するか、`new` / `old` を集計してください。
+
+        ⚠️ 集計 EP の `/v1/stats/sims/monthly_usage` は逆に `合計行` を除外しており、**本 EP が `合計行` を含む・集計 EP は除外する、という非対称は意図的**です（本 EP は生の実績を、集計 EP は請求根拠となる合算値を返すため）。
+
+        該当データが無い場合は空配列 `[]` を返します（200）。
+      operationId: GetMonthlyUsageBySim
+      parameters:
+        - name: year_month
+          in: query
+          required: true
+          description: 対象月（`YYYYMM` 6 桁ゼロ埋め）
+          schema:
+            type: string
+            pattern: '^\d{4}(0[1-9]|1[0-2])$'
+            example: "202608"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功（該当なしは空配列 `[]`）
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MonthlyUsageBySim"
+              example:
+                - sim_id: "8981080321000912770"
+                  year_month: "202608"
+                  msisdn: "812001004300889"
+                  plan_name: "IoT Standard 3GB"
+                  downlink_bytes: 234567890
+                  uplink_bytes: 12345678
+                  total_bytes: 246913568
+                  reissue_category: null
+                - sim_id: "8981080321000913322"
+                  year_month: "202608"
+                  msisdn: "812001004300911"
+                  plan_name: "IoT Standard 3GB"
+                  downlink_bytes: 15667981
+                  uplink_bytes: 900000
+                  total_bytes: 16567981
+                  reissue_category: "total"
+        "400":
+          $ref: "#/components/responses/BadRequest"
 
   /stats/sims/cumulative_usage:
     get:
       tags: [Statistics]
-      summary: ListCumulativeUsage — 全 SIM 累積通信量
+      summary: 全 SIM 累積通信量
       description: |
-        顧客の全 SIM の累積通信量を一括取得します。概ねリアルタイムで更新されます（最大 5 分のラグがあります）。
+        顧客の全 SIM の累積通信量を一括取得します。日次で更新されます。
 
         30,000 件以下の場合は JSON 配列を直接返却します。
-        30,000 件を超える場合は S3 にエクスポートし、署名付きダウンロード URL へ 302 リダイレクトします（gzip 圧縮 NDJSON、5分有効）。
+        30,000 件を超える場合は S3 にエクスポートし、署名付きダウンロード URL へ 302 リダイレクトします（NDJSON、`Content-Type: application/x-ndjson`、5分有効）。実体は gzip 圧縮されており、S3 側で `Content-Encoding: gzip` を付与するため、`curl --compressed` / requests / ブラウザなど標準的な HTTP クライアントは自動的に解凍します。
       operationId: ListCumulativeUsage
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功（30,000 件以下）
@@ -215,7 +418,7 @@ paths:
           description: 大規模データ（30,000 件超）— S3 署名付き URL へリダイレクト
           headers:
             Location:
-              description: S3 presigned URL（gzip 圧縮 NDJSON、5分有効）
+              description: "S3 presigned URL（NDJSON、`Content-Encoding: gzip` を付与、5分有効）"
               schema:
                 type: string
         "400":
@@ -232,7 +435,7 @@ paths:
   /stats/sims/current_plan_usage:
     get:
       tags: [Statistics]
-      summary: ListCurrentPlanUsage — 全 SIM 現プラン消費量
+      summary: 全 SIM 現プラン消費量
       description: |
         顧客の全 SIM の「現プランでの消費量」を一括取得します。
 
@@ -241,6 +444,8 @@ paths:
         値です。`usage_offset_bytes` が記録されていない SIM では
         `current_plan_used_bytes` は `null` を返します。
       operationId: ListCurrentPlanUsage
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -264,7 +469,7 @@ paths:
   /stats/sims/{sim_id}/current_plan_usage:
     get:
       tags: [Statistics]
-      summary: GetSimCurrentPlanUsage — SIM 現プラン消費量
+      summary: SIM 現プラン消費量
       description: |
         特定 SIM の「現プランでの消費量」を取得します。
 
@@ -280,6 +485,7 @@ paths:
           description: SIM 識別子
           schema:
             type: string
+        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -303,8 +509,13 @@ paths:
   /stats/sims/{sim_id}/monthly_usage:
     get:
       tags: [Statistics]
-      summary: GetSimMonthlyUsage — SIM 別月次通信量
-      description: 特定 SIM の月次通信量を取得します（直近12ヶ月分）。
+      summary: SIM 別月次通信量
+      description: |
+        特定 SIM の月次通信量を取得します（直近12ヶ月分、year_month 降順）。
+
+        ⚠️ **SIM 再発行が発生した月は、同一 `year_month` に複数行が返ります**（`旧SIM` / `新SIM` / `合計行` の 3 行のうち、その SIM の Inventory 配下にあたるもの）。**`合計行`（旧 + 新の合算行）を含むため、単純合計すると二重計上になります。** 各行の区別は `reissue_category` を参照してください。
+
+        ⚠️ 集計 EP の `/v1/stats/sims/monthly_usage` は逆に `合計行` を除外しており、**本 EP が `合計行` を含む・集計 EP は除外する、という非対称は意図的**です（本 EP は生の実績を、集計 EP は請求根拠となる合算値を返すため）。
       operationId: GetSimMonthlyUsage
       parameters:
         - name: sim_id
@@ -313,6 +524,7 @@ paths:
           description: SIM 識別子
           schema:
             type: string
+        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -328,16 +540,124 @@ paths:
                   year_month: "202603"
                   downlink_bytes: 1000000000
                   uplink_bytes: 300000000
+                  reissue_category: null
+                - sim_id: "SIM001"
+                  customer_code: "110139701"
+                  year_month: "202604"
+                  downlink_bytes: 1500000000
+                  uplink_bytes: 450000000
+                  reissue_category: "total"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /stats/sims/{sim_id}/daily_usage:
+    get:
+      tags: [Statistics]
+      summary: SIM 別日次通信量
+      description: |
+        特定 SIM の日別通信量を取得します（date 降順）。
+
+        - 対象期間は **JST の前日を終端とする直近 `days` 日**です。当日分は日次バッチへ未反映のため含まれません。当日分が必要な場合は `/stats/sims/{sim_id}/details` を利用してください。
+        - **通信のない日も 0 バイトの行として返却**されるため、実績のある SIM なら常に `days` 件が返ります。
+        - **404 になるのは、指定 `customer_code` 配下に当該 SIM の通信実績レコードが 1 件も存在しない場合**です。SIM 自体は存在しても一度も通信していなければ 404 になります。「SIM が存在しない」ことの判定には使えません。
+        - `data_through` は日次集計が確定している最終日、`checked_at` は集計時刻（JST）です。
+
+        ### `is_confirmed` の意味と `in_bytes = 0` の解釈
+
+        `is_confirmed` は該当日の値の確定度を示します。**`false` かつ 0 バイトの行は、`date` と `checked_at` の差によって意味が変わります。**
+
+        - `true`: 日次集計（1DAY）が反映済みの確定値です。`0` も含めて実測値です。
+        - `false`: 日次集計が未反映の日です。値の意味は次のとおりです。
+          - **`date` が `checked_at` の前日以降**: 5 分粒度集計（5MINS）からの速報値です。`0` より大きい値は実測値で、取り込みの進行に伴い微増する可能性があります。`0` は 5MINS にも記録が無い日です。
+          - **`date` がそれより古い**: 5MINS による補完の対象外の日です（補完には直近 24 時間に取り込まれた 5MINS レコードのみを使用します）。**この場合の `0` は「通信が無かった」ことを意味しません。値が不明なものとして扱い、残量計算の入力にしないでください。**
+
+        日次バッチ（00:15 JST）が正常であれば、通常は前日以前のすべての日が `true` になります。`false` の日が 2 日以上連続する場合は集計パイプラインの停止を疑ってください。
+
+        ### 「真の 0」に見えるが実データがある 2 つのケース
+
+        次の 2 つは `downlink_bytes` / `uplink_bytes` が `0` かつ `is_confirmed: true` で返るため、**上の `is_confirmed` の分岐では検出できません。** どちらも「無通信」ではないので、無通信と断定する前に確認してください。
+
+        **1. 顧客コードの付け替え（商流変更）**
+
+        使用量データの `customer_code` は**契約時点の値で、遡及修正されません**。SIM が別の顧客コードへ付け替えられた場合、**新しい顧客コードで問い合わせると付け替え前の日が `0`、古い顧客コードで問い合わせると付け替え後の日が `0`** になります。期間をまたぐ場合は、両方の顧客コードで取得して突き合わせる必要があります。
+
+        **2. MSISDN の付け替え**
+
+        日別の集計は **MSISDN を基準に結合**しています。同一顧客内で SIM の MSISDN が付け替えられた場合、**付け替え前の日が `0`** になります。逆に、ある MSISDN が別の SIM に再利用されていると、その期間の実績が合算されることがあります。
+      operationId: GetSimDailyUsage
+      parameters:
+        - name: sim_id
+          in: path
+          required: true
+          description: SIM 識別子
+          schema:
+            type: string
+        - name: days
+          in: query
+          required: false
+          description: 取得する日数（前日を終端とする直近 N 日）
+          schema:
+            type: integer
+            default: 3
+            minimum: 1
+            maximum: 31
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SimDailyUsage"
+              example:
+                - sim_id: "8981080301013111404"
+                  msisdn: "812001033859274"
+                  customer_code: "110139701"
+                  date: "2026-08-24"
+                  downlink_bytes: 77597
+                  uplink_bytes: 278985
+                  total_bytes: 356582
+                  is_confirmed: true
+                  checked_at: "2026-08-25T13:24:10.943"
+                  data_through: "2026-08-24"
+                - sim_id: "8981080301013111404"
+                  msisdn: "812001033859274"
+                  customer_code: "110139701"
+                  date: "2026-08-23"
+                  downlink_bytes: 0
+                  uplink_bytes: 0
+                  total_bytes: 0
+                  is_confirmed: true
+                  checked_at: "2026-08-25T13:24:10.943"
+                  data_through: "2026-08-24"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: |
+            クエリパラメータの型変換エラー (例: `days=abc`)。
+            FastAPI が範囲チェックより先に型変換を実行するため、`days` に整数化できない値を渡すと 400 ではなく 422 を返します。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Snowflake 未設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /stats/sims/{sim_id}/details:
     get:
       tags: [Statistics]
-      summary: GetSimUsageDetails — SIM CDR（通信明細）
-      description: 特定 SIM の通信明細（CDR）を取得します。直近 288 件（約24時間分）のレコードが返却されます。
+      summary: SIM CDR（通信明細）
+      description: 特定 SIM の通信明細（CDR）を取得します。直近 288 件（5 分粒度。連続してデータがある場合で約 24 時間分）のレコードが返却されます。
       operationId: GetSimUsageDetails
       parameters:
         - name: sim_id
@@ -346,6 +666,7 @@ paths:
           description: SIM 識別子
           schema:
             type: string
+        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -370,8 +691,11 @@ paths:
   /stats/sims/{sim_id}/cumulative_usage:
     get:
       tags: [Statistics]
-      summary: GetSimCumulativeUsage — 累積通信量
-      description: 特定 SIM の累積通信量を取得します。概ねリアルタイムで更新されます（最大 5 分のラグがあります）。
+      summary: 累積通信量
+      description: |
+        特定 SIM の累積通信量を取得します。日次で更新されます。
+
+        ⚠️ **Snowflake 未設定時の RDS フォールバック経路では、SIM 再発行月の `合計行`（旧 + 新 の合算行）を除外せずに `SUM()` しています**。該当月分が二重計上されます。集計 EP の `/v1/stats/sims/monthly_usage` は除外済みで、**本 EP は未対応**という非対称が残っています（本 PR のスコープ外。[#110](https://github.com/misora-connect/mc-api/issues/110) で追跡）。
       operationId: GetSimCumulativeUsage
       parameters:
         - name: sim_id
@@ -380,6 +704,7 @@ paths:
           description: SIM 識別子
           schema:
             type: string
+        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -402,7 +727,7 @@ paths:
   /exports:
     get:
       tags: [Exports]
-      summary: ListExports — エクスポート種別一覧
+      summary: エクスポート種別一覧
       description: 利用可能なエクスポート種別の一覧を取得します。
       operationId: ListExports
       responses:
@@ -423,7 +748,7 @@ paths:
   /exports/sims:
     post:
       tags: [Exports]
-      summary: CreateSimsExport — SIM データエクスポート
+      summary: SIM データエクスポート
       description: |
         SIM データのエクスポートをリクエストします。
 
@@ -433,6 +758,7 @@ paths:
         解約済み SIM は除外されます。
       operationId: CreateSimsExport
       parameters:
+        - $ref: "#/components/parameters/CustomerCode"
         - name: format
           in: query
           description: 出力形式
@@ -484,10 +810,11 @@ paths:
   /recharges/sims:
     get:
       tags: [Recharges]
-      summary: ListRechargeableSims — リチャージ対象 SIM 一覧
+      summary: リチャージ対象 SIM 一覧
       description: リチャージ対象となる SIM の一覧を取得します。各 SIM のリチャージ可否、現在のプラン情報、予約件数が含まれます。
       operationId: ListRechargeableSims
       parameters:
+        - $ref: "#/components/parameters/CustomerCode"
         - $ref: "#/components/parameters/IccidQuery"
         - $ref: "#/components/parameters/SimIdQuery"
         - $ref: "#/components/parameters/PageSize"
@@ -501,7 +828,7 @@ paths:
                 $ref: "#/components/schemas/RechargeSimsResponse"
               example:
                 sims:
-                  - sim_id: "8981080321000912770"
+                  - iccid: "8981080321000912770"
                     product_code: "PM058"
                     plan_type: capacity
                     extension_end_date: "2026-03-05"
@@ -519,99 +846,10 @@ paths:
         "502":
           $ref: "#/components/responses/BadGateway"
 
-  /recharges/sims/{sim_id}/balance:
-    get:
-      tags: [Recharges]
-      summary: GetSimBalance — SIM 残量取得
-      description: |
-        特定 SIM の使える総量・残り容量・使用量を取得します。
-        マイページ等で「◯GB 中 ◯GB 残り」を描画する用途を想定しています。
-
-        **繰越（Banked Data）の扱い**: 使える総量 = 現プラン容量 + 繰越（未消化分 = Banked Data）。
-        消費順序は 現プラン → 繰越で、現プランの枯渇または期間満了時に繰越分は自動的に払い出されます
-        （お客様の操作は不要で、通信は途切れません）。したがって残量は現プランと繰越をまたいで連続して減ります。
-        繰越は無期限ではなく、払い出し用の内部プランの期間終了時に消滅します。
-
-        容量 3 値（`total_granted_bytes` / `total_remaining_bytes` / `used_bytes`）は capacity プランのみ値を持ち、
-        daily プランおよび総枠未確定時（初回リチャージ前・プランマスタ未登録等）は `null` を返します。
-
-        **daily プラン（1GB/day 等）**: 通算残量の概念を持たないため容量 3 値は `null` のまま、
-        当日枠を `daily_limit_bytes` / `daily_used_bytes` / `daily_remaining_bytes` で返します。
-        当日利用量は **日本時間の 0:00 以降**の実績を集計したもので、日付が変わると 0 に戻ります。
-        日次上限のないプラン（無制限）や、リセット周期が 1 日でないプランでは上限・残量が `null` になり、
-        当日利用量のみを返します。
-
-        レスポンスは全プランタイプで同一のスキーマです。capacity プランでは `daily_*` が、
-        daily プランでは容量 3 値が、それぞれ `null` として含まれます。
-      operationId: GetSimBalance
-      parameters:
-        - name: sim_id
-          in: path
-          required: true
-          description: SIM ID（ICCID、19-20 桁の数字）
-          schema:
-            type: string
-      responses:
-        "200":
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RechargeSimBalance"
-              examples:
-                capacity:
-                  summary: capacity プラン（容量型）
-                  value:
-                    sim_id: "8981080321000912770"
-                    plan_type: capacity
-                    total_granted_bytes: 6442450944
-                    total_remaining_bytes: 5368709120
-                    used_bytes: 1073741824
-                    banked_data_bytes: 1073741824
-                    filler_state: NORMAL
-                    checked_at: "2026-08-26T05:30:00Z"
-                    latest_record_time: "2026-08-25T15:00:00Z"
-                    daily_limit_bytes: null
-                    daily_used_bytes: null
-                    daily_remaining_bytes: null
-                daily:
-                  summary: daily プラン（日次型・1GB/day）
-                  value:
-                    sim_id: "8981080321000912788"
-                    plan_type: daily
-                    total_granted_bytes: null
-                    total_remaining_bytes: null
-                    used_bytes: null
-                    banked_data_bytes: null
-                    filler_state: NORMAL
-                    checked_at: "2026-09-03T05:30:00Z"
-                    latest_record_time: "2026-09-03T05:18:00Z"
-                    daily_limit_bytes: 1073741824
-                    daily_used_bytes: 268435456
-                    daily_remaining_bytes: 805306368
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "403":
-          description: 指定 SIM を当該顧客が所有していない
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "502":
-          $ref: "#/components/responses/BadGateway"
-        "503":
-          description: 累積 usage 取得に失敗（古い値は返さない）
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
   /recharges/sims/{sim_id}/plans:
     get:
       tags: [Recharges]
-      summary: ListSimRechargePlans — SIM 別リチャージプラン
+      summary: SIM 別リチャージプラン
       description: 特定 SIM の現在のプランに基づいて、利用可能なリチャージプランを取得します。
       operationId: ListSimRechargePlans
       parameters:
@@ -621,6 +859,7 @@ paths:
           description: SIM ID（ICCID）
           schema:
             type: string
+        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -641,12 +880,47 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /recharges/sims/{sim_id}/balance:
+    get:
+      tags: [Recharges]
+      summary: SIM 残量取得
+      description: |
+        SIM の残容量情報を取得します（プランタイプに応じた 3 値を返す）。
+
+        累積 usage の取得に失敗した場合は `503` を返し、古い残量値は返しません（stale データを防ぐ）。
+      operationId: GetSimBalance
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+        - name: sim_id
+          in: path
+          required: true
+          description: SIM 識別子（ICCID）
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RechargeSimBalance"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          description: 累積 usage の取得に失敗（古い値は返さない）
+
   /recharges/plans:
     get:
       tags: [Recharges]
-      summary: ListRechargePlans — 全リチャージプラン一覧
+      summary: 全リチャージプラン一覧
       description: 顧客が利用可能な全リチャージプランのカタログを取得します。
       operationId: ListRechargePlans
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -675,7 +949,7 @@ paths:
   /recharges/plans/{plan_code}:
     get:
       tags: [Recharges]
-      summary: GetRechargePlan — プラン詳細
+      summary: プラン詳細
       description: 特定のリチャージプランの詳細情報を取得します。
       operationId: GetRechargePlan
       parameters:
@@ -685,6 +959,7 @@ paths:
           description: プラン識別子
           schema:
             type: string
+        - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
           description: 成功
@@ -706,10 +981,11 @@ paths:
   /recharges/reservations:
     get:
       tags: [Recharges]
-      summary: ListRechargeReservations — リチャージ予約一覧
-      description: 顧客のリチャージ予約一覧を取得します。SIM ID やステータスでのフィルタリングが可能です。
+      summary: リチャージ予約一覧
+      description: 顧客のリチャージ予約一覧を取得します。ICCID / SIM ID やステータスでのフィルタリングが可能です。
       operationId: ListRechargeReservations
       parameters:
+        - $ref: "#/components/parameters/CustomerCode"
         - $ref: "#/components/parameters/IccidQuery"
         - $ref: "#/components/parameters/SimIdQuery"
         - name: status
@@ -730,7 +1006,7 @@ paths:
               example:
                 reservations:
                   - reservation_id: "RR-00012"
-                    sim_id: "8981080321000912770"
+                    iccid: "8981080321000912770"
                     plan_code: "OI061331"
                     status: Executed
                     reserved_at: "2026-03-10T10:30:00Z"
@@ -747,19 +1023,19 @@ paths:
           $ref: "#/components/responses/BadGateway"
     post:
       tags: [Recharges]
-      summary: CreateRechargeReservation — リチャージ予約作成
+      summary: リチャージ予約作成
       description: |
-        SIM に対するリチャージ予約を作成します。1 つの SIM に対して最大 3 件の予約が可能です。
+        SIM に対するリチャージ予約を作成します。1つの SIM に対して最大3件の予約が可能です。
 
-        **実行タイミング** — 予約したリチャージが実際に適用されるタイミングはプランタイプによって異なります。
+        **実行タイミング**:
+        - **容量型 (capacity)**: 現在の残量が 500MB 未満、もしくは容量プラン終了日を過ぎた 21:00 JST に自動実行される。
+        - **日次型 (daily)**: 毎日 20:00 JST に当日分の枠が自動実行される。
+        - 500MB 以下の小容量プランは残量閾値を待たずに前倒し実行される場合がある。
 
-        - `capacity`（容量上限型）：残データ量が 500MB 未満になった時点、または利用終了日の 21:00（JST）以降
-        - `daily`（日次上限型）：利用終了日に到達後、毎日 20:00（JST）の日次処理で実行（残データ量による判定なし）
-
-        ※ 上限が 500MB 以下の小容量プランでは、上限に到達した時点で実行されます。
-
-        予約直後は `status` が `reserved` となり、実行後に `executed` へ変わります。
+        `status` は生成時に `reserved` で、上記のタイミングに到達すると `executed` に遷移する。
       operationId: CreateRechargeReservation
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
       requestBody:
         required: true
         content:
@@ -791,15 +1067,17 @@ paths:
   /recharges/immediate:
     post:
       tags: [Recharges]
-      summary: CreateImmediateRecharge — 即時リチャージ（プラン即時書換・残量リセット）
+      summary: 即時リチャージ（プラン即時書換・残量リセット）
       description: |
-        SIM ID とプランコードを指定して、**即時にプラン書換・残量リセット・PCRF 1 回 sync** を実行します。
+        ICCID とプランコードを指定して、**即時にプラン書換・残量リセット・PCRF 1 回 sync** を実行します。
         容量型プランのみ対象（日次型・CPFR・Internal はエラー）。予約の作成と実行をその場で行い、
         予約は即 `Executed` 化されます。
 
         `force=true` で既存 `Reserved` 予約を `Cancelled` 化して前倒し実行します。
         PCRF 同期中（`SyncStatus=実行中`）は force 不問で `409 ALREADY_SYNCING`。
       operationId: CreateImmediateRecharge
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
       requestBody:
         required: true
         content:
@@ -818,7 +1096,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ImmediateRechargeResponse"
               example:
-                sim_id: "8981080301011327143"
+                iccid: "8981080301011327143"
                 plan_code: "OI071522"
                 status: Executed
                 reservation_id: "a1XRB000005P7Q12AK"
@@ -860,6 +1138,16 @@ components:
       description: API Key
 
   parameters:
+    CustomerCode:
+      name: customer_code
+      in: query
+      description: |
+        9桁の顧客コード。省略時は認証情報に紐づく顧客コードを使用します。
+        指定する場合は認証情報のスコープと一致している必要があり、不一致の場合は 403 を返します。
+      schema:
+        type: string
+        pattern: '^\d{9}$'
+        example: "110139701"
     PageSize:
       name: page_size
       in: query
@@ -876,56 +1164,296 @@ components:
     IccidQuery:
       name: iccid
       in: query
-      description: "（後方互換）SIM の ICCID でフィルタ。`sim_id` の使用を推奨"
+      deprecated: true
+      description: SIM の ICCID でフィルタ。`sim_id` と併用された場合は `iccid` を優先
       schema:
         type: string
-      deprecated: true
     SimIdQuery:
       name: sim_id
       in: query
-      description: SIM ID（ICCID）でフィルタ
+      description: SIM ID (ICCID のエイリアス) でフィルタ
       schema:
         type: string
+    SimIdPrefixFilter:
+      name: sim_id
+      in: query
+      description: |
+        SIM 識別子（`sim_id`）の**前方一致**で絞り込みます（#76）。
+
+        - **英数字**・32 文字以内。条件を満たさない値（記号を含むもの）・空文字は **400**
+        - **小文字は大文字として扱います**（`ab123` と `AB123` は同じ結果）。
+          格納値が英大文字と数字のみのためです
+        - ⚠️ **`sim_id` は ICCID とは限りません。** 19 桁の数字（ICCID）と、
+          英大文字 2 文字 + 数字 13 桁の 15 桁の識別子が混在し、後者が約 37% を
+          占めます（2026-08-21 本番実測）。前方一致の桁数を ICCID 前提で
+          決め打ちしないでください
+        - 他の絞り込み条件とは **AND** で結合します
+
+        ⚠️ **`/v1/recharges/sims` の `sim_id` とは一致方式が違います。**
+        あちらは**完全一致**（`recharges/lambda_function.py` のクライアント側フィルタ）で、
+        こちらは前方一致です。同じパラメータ名なので取り違えに注意してください。
+      schema:
+        type: string
+        pattern: '^[0-9A-Za-z]+$'
+        maxLength: 32
+        example: "8981080"
+    MsisdnPrefixFilter:
+      name: msisdn
+      in: query
+      description: |
+        電話番号（MSISDN）の**前方一致**で絞り込みます（#76）。
+
+        処理は次の順序で行います（`pattern` は入力の形を緩く示したものなので、
+        受理されるかどうかはこの順序が決めます）:
+
+        1. **区切り文字（ハイフン `-`・半角/全角スペース・括弧 `(` `)`）を除去**します
+           （`070-1234-5678` と `07012345678` は同じ結果）
+        2. **国番号に変換**します。先頭の `+` は落とし（`%2B8140` → `8140`）、
+           先頭が `00` ならそれを落とし（`00819012` → `819012`）、
+           先頭が `0` なら `81` に置き換えます（`07012` → `817012`）。
+           `mc_sims.msisdn` が国番号付き（`8140...`）で格納されているためです
+        3. **変換後の値**を検証します。数字のみ・空でない・**32 文字以内**であること。
+           満たさない場合は **400**（全角数字・記号を含む値、`---` のように除去すると
+           空になる入力、変換後に 32 文字を超えるものが該当）
+
+        先頭の `+` は、生の `+` でもパーセントエンコード（`%2B`）でも同じ結果になります
+        （前者は空白としてデコードされたうえで、1. の区切り文字として除去されるため）。
+      schema:
+        # 区切り文字を含む入力も受け付ける。数字のみ・32 文字以内の判定は
+        # 区切り文字を除いた後の値に対して行われるため、maxLength は置かない。
+        type: string
+        pattern: '^\+?[0-9()\- 　]+$'
+        example: "070-1234-5678"
 
   schemas:
     # ----- SIM -----
     Sim:
       type: object
+      description: |
+        `GET /v1/sims` / `GET /v1/sims/{sim_id}` の応答。`mc_sims` ビューの 37 列に対応する。
+
+        `filter_nulls=true`（既定）のとき、値が null のフィールドは **キーごと応答から消える**
+        （`null` として返るのではない）。`nullable: true` が効くのは `filter_nulls=false` のとき。
       properties:
         sim_id:
           type: string
+          description: |
+            SIM 識別子（`sf.inventory.Name`）。**ICCID とは限りません。**
+            19 桁の数字（ICCID）と、英大文字 2 文字 + 数字 13 桁の 15 桁の識別子が
+            混在し、後者が約 37% を占めます（2026-08-21 本番実測）。
         customer_code:
           type: string
-        iccid:
+          description: 顧客コード（9桁）
+        application_start_date:
           type: string
+          format: date
+          nullable: true
+          description: 申込開始日
+        cancellation_mobile_core_date:
+          type: string
+          format: date
+          nullable: true
+          description: モバイルコア解約日
+        carrier_opening_date:
+          type: string
+          format: date
+          nullable: true
+          description: キャリア開通日
+        carrier_withdrawal_date:
+          type: string
+          format: date
+          nullable: true
+          description: キャリア脱退日
+        communication_generation:
+          type: string
+          nullable: true
+          description: 通信世代（4G/5G 等）
+        dns_primary:
+          type: string
+          nullable: true
+          description: プライマリ DNS
+        dns_secondary:
+          type: string
+          nullable: true
+          description: セカンダリ DNS
+        extension_end_date:
+          type: string
+          format: date
+          nullable: true
+          description: 延長終了日
+        first_communicating_date:
+          type: string
+          format: date
+          nullable: true
+          description: 初回通信日
+        imsi:
+          type: string
+          description: IMSI。実データでは 38% が空文字
+        ip_address:
+          type: string
+          nullable: true
+          description: IP アドレス
+        ip_address_type:
+          type: string
+          nullable: true
+          description: IP アドレス種別
+        ipv6_address_dns_primary:
+          type: string
+          description: IPv6 プライマリ DNS。実データでは 100% が空文字
+        ipv6_address_dns_secondary:
+          type: string
+          description: IPv6 セカンダリ DNS。実データでは 100% が空文字
+        ipv6_address:
+          type: string
+          description: IPv6 アドレス。実データでは 100% が空文字
+        line_category:
+          type: string
+          nullable: true
+          description: 回線種別
+        line_status_from_mc:
+          type: string
+          nullable: true
+          description: MC 側の回線状態
+        line_stoped_date:
+          type: string
+          format: date
+          nullable: true
+          description: 回線停止日
+        lines_status:
+          type: string
+          nullable: true
+          description: 回線状態
+        linestarted_date:
+          type: string
+          format: date
+          nullable: true
+          description: 回線開始日
+        opening_date:
+          type: string
+          format: date
+          nullable: true
+          description: 開通日
+        msisdn:
+          type: string
+          description: 電話番号。実データでは 11% が空文字
+        realm:
+          type: string
+          nullable: true
+          description: レルム
+        service_category:
+          type: string
+          nullable: true
+          description: サービス種別
+        use_start_expiration_date:
+          type: string
+          format: date
+          nullable: true
+          description: 利用開始期限
+        shipping_date:
+          type: string
+          format: date
+          nullable: true
+          description: 出荷日
+        apn:
+          type: string
+          description: APN。実データでは 24% が空文字
+        active_plan_name:
+          type: string
+          description: 現在適用中のプラン名（商談商品名）。`plan_detail` に相当する。実データでは 15% が空文字
+        product_name:
+          type: string
+          description: 商品名。実データ上 `active_plan_name` と同値。実データでは 15% が空文字
+        sim_category:
+          type: string
+          nullable: true
+          description: SIM 種別
+        product_name_id:
+          type: string
+          description: 商品名 ID。名称に反して ID ではなく、`product_name` とは別の商品名が入る。実データでは 15% が空文字
         status:
           type: string
-          enum: [active, suspended, terminated]
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
+          enum: [stock, ready, active, inactive, terminated, unknown]
+          description: |
+            回線状態。Salesforce の状態フィールドから CASE 式で導出され、上から順に評価されます
+            （`stock` → `ready` → `active` → `inactive` → `terminated` → `unknown`）。
 
-    SimDetail:
-      allOf:
-        - $ref: "#/components/schemas/Sim"
-        - type: object
-          properties:
-            plan_type:
-              type: string
-              enum: [capacity, daily]
+            **`SimSummary` との対応**: `ready` / `active` / `terminated` / `unknown` は共通ですが、
+            `stock` と `inactive` はサマリに出力されません。逆にサマリの `subscribed` は
+            `status <> 'terminated'` の集計値で、この enum には対応する値がありません（#16）。
+
+            ⚠️ **`active` の件数を稼働回線数として扱わないでください。** 評価順の都合で
+            `ready` の条件が先に当たるため、実際に稼働している回線の大半が `ready` に分類されます
+            （本番実測: `active` は 200 万行中 42 行、うち 17 行は Salesforce 側で解約済み）。
+            この判定ロジックの見直しは #28 で扱います。
+        session_status:
+          type: string
+          enum: [online, offline]
+          description: セッション接続状態。開始済みかつ未終了の CDR がある場合に `online`
+        session_created_at:
+          type: string
+          nullable: true
+          description: |
+            最新セッションの開始時刻。
+            **RFC 3339 形式ではありません。** 実応答は `"2026-08-18 22:54:11"` のように
+            スペース区切り・タイムゾーンなしの文字列です（RDS Data API が返す形式のまま）。
+            ISO 8601 化は #16 で扱います。
+        session_terminated_at:
+          type: string
+          nullable: true
+          description: |
+            最新セッションの終了時刻。
+            **RFC 3339 形式ではありません。** 実応答は `"2026-08-18 22:54:11"` のように
+            スペース区切り・タイムゾーンなしの文字列です（RDS Data API が返す形式のまま）。
+            ISO 8601 化は #16 で扱います。
+
+    SimCount:
+      type: object
+      description: |
+        `GET /v1/sims` と同じ絞り込みに一致する `mc_sims` ビューの行数。
+        SIM の枚数ではありません。
+      required: [count]
+      properties:
+        count:
+          type: integer
+          description: 一致した行数
 
     SimSummary:
       type: object
+      description: |
+        顧客に紐づく SIM のステータス別集計。各件数は `mc_sims` の行数を数えたもの。
       properties:
-        total_sims:
+        customer_code:
+          type: string
+          description: 顧客コード
+        total:
           type: integer
-        active_sims:
+          description: 全件
+        subscribed:
           type: integer
-        suspended_sims:
+          description: 解約以外（在庫・停止を含む）
+        ready:
           type: integer
+          description: 開通済みで出荷済み
+        active:
+          type: integer
+          description: 稼働中
+        online:
+          type: integer
+          description: セッション接続中
+        terminated:
+          type: integer
+          description: 解約済み
+        unknown:
+          type: integer
+          description: 上記のいずれにも該当しない
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            集計元データ（`sf.inventory`）の最終更新時刻。当該顧客のレコードのうち
+            Salesforce 上で最後に更新されたものの時刻を返す（同期パイプラインの実行時刻ではない）。
+            対象レコードが無い場合は null。
 
     # ----- Statistics -----
     MonthlyUsage:
@@ -933,6 +1461,7 @@ components:
       properties:
         year_month:
           type: string
+          description: "YYYYMM 6 桁ゼロ埋め"
           example: "202603"
         downlink_bytes:
           type: integer
@@ -947,7 +1476,98 @@ components:
               type: string
             customer_code:
               type: string
+            reissue_category:
+              type: string
+              nullable: true
+              enum: ["new", "old", "total", null]
+              description: |
+                SIM 再発行が発生した月のみ値が入る。通常月は `null`。
+                - `new`: 再発行後の通信量
+                - `old`: 再発行前の通信量（旧 Inventory 配下）
+                - `total`: 旧 + 新 の合算行
         - $ref: "#/components/schemas/MonthlyUsage"
+
+    MonthlyUsageBySim:
+      type: object
+      properties:
+        sim_id:
+          type: string
+          nullable: true
+          description: "view は LEFT JOIN のため、参照先の sf.inventory 行が無い場合は null になりうる。"
+        year_month:
+          type: string
+          description: "YYYYMM 6 桁ゼロ埋め"
+          example: "202608"
+        msisdn:
+          type: string
+          nullable: true
+          description: "sf.inventory.MSISDN__c は NULL 可 (dev 実測 7%)。"
+        plan_name:
+          type: string
+          nullable: true
+          description: "sf.use_achievement.PlanName__c は view の WHERE で絞っていないため NULL 可。"
+        downlink_bytes:
+          type: integer
+        uplink_bytes:
+          type: integer
+        total_bytes:
+          type: integer
+          description: "サーバ側で `downlink_bytes + uplink_bytes` を計算した値。片方 NULL の場合はもう一方の値。"
+        reissue_category:
+          type: string
+          nullable: true
+          enum: ["new", "old", "total", null]
+          description: |
+            SIM 再発行が起きた月に Salesforce が作る 3 行の種別。通常行は `null`。
+            - `new`: 再発行後の通信量
+            - `old`: 再発行前の通信量（旧 Inventory 配下）
+            - `total`: 旧 + 新 の合算行（新 Inventory と同じ `(sim_id, year_month)` に載る）
+
+    SimDailyUsage:
+      type: object
+      properties:
+        sim_id:
+          type: string
+          description: SIM 識別子 (ICCID)
+        msisdn:
+          type: string
+        customer_code:
+          type: string
+        date:
+          type: string
+          format: date
+          description: 対象日 (JST カレンダー日)
+        downlink_bytes:
+          type: integer
+        uplink_bytes:
+          type: integer
+        total_bytes:
+          type: integer
+        is_confirmed:
+          type: boolean
+          description: |
+            該当日の値の確定度。`true` = 日次集計（1DAY）で確定済み。
+            `false` = 未確定で、`date` が `checked_at` の前日以降なら 5 分粒度集計（5MINS）由来の速報値、
+            それより古い日は補完対象外のため値が不明（`0` を「通信なし」として扱わないこと）。
+            詳細はエンドポイントの description を参照。
+        checked_at:
+          type: string
+          format: date-time
+          description: |
+            集計時刻（JST の実時刻）。
+
+            現時点では **dev と prod で表記が異なります**。dev は `+09:00` 付き
+            (例: `2026-09-04T12:45:48.326000+09:00`)、prod はタイムゾーンなし
+            (例: `2026-08-25T13:24:10.943`) です。Snowflake の UDTF が返す型が
+            dev は `TIMESTAMP_TZ`、prod は `TIMESTAMP_NTZ` のためです。
+            **タイムゾーンの有無に依存しない実装にしてください。**
+
+            この差異は暫定です。日時表記を RFC3339 UTC に統一する対応が入ると、
+            dev / prod とも `YYYY-MM-DDTHH:MM:SSZ` に正規化され、本注記は撤去します。
+        data_through:
+          type: string
+          format: date
+          description: 日次集計が確定している最終日
 
     CdrRecord:
       type: object
@@ -1072,9 +1692,8 @@ components:
     RechargeSim:
       type: object
       properties:
-        sim_id:
+        iccid:
           type: string
-          description: SIM の一意識別子（ICCID）
         product_code:
           type: string
         plan_type:
@@ -1113,78 +1732,36 @@ components:
     RechargeSimBalance:
       type: object
       description: |
-        SIM の使える総量（現プラン容量 + 繰越）・残量・使用量。容量 3 値は capacity プランのみ値を持ち、
-        daily プランおよび総枠未確定時（初回リチャージ前・プランマスタ未登録等）は `null` を返します。
-        daily プランは代わりに当日枠（`daily_*`）を返します。
-        全プランタイプで同一スキーマのため、該当しない項目は `null` として含まれます。
+        SIM の残量情報。プランタイプ (`capacity` / `daily`) に応じた 3 値
+        （付与済み・使用済み・残量）を返す。`filler_state` は残量が閾値を下回った
+        ときの前倒し実行状態を示す。
       properties:
         sim_id:
           type: string
-          description: SIM の一意識別子（ICCID）
+          description: SIM 識別子（ICCID）
         plan_type:
           type: string
           enum: [capacity, daily]
-          nullable: true
-          description: プランタイプ。プランマスタ未登録時は `null`
+          description: 現在適用中のプラン種別
         total_granted_bytes:
           type: integer
-          nullable: true
-          description: >-
-            付与容量（bytes）＝「◯GB 中 ◯GB 残り」の前者。
-            現プラン容量 + 繰越（Banked Data）の合計。capacity プランのみ、それ以外は `null`
+          description: 付与済み容量（バイト）
         total_remaining_bytes:
           type: integer
-          nullable: true
-          description: >-
-            利用可能残量（bytes）＝「◯GB 中 ◯GB 残り」の後者。繰越分を含む。
-            サーバ側で `0 ≤ remaining ≤ total_granted_bytes` および `used = granted − remaining`
-            の整合を保証するため、利用者側での追加補正は不要。capacity プランのみ
+          description: 残量（バイト）
         used_bytes:
           type: integer
-          nullable: true
-          description: 使用量（bytes、= `total_granted_bytes − total_remaining_bytes`）。capacity プランのみ
+          description: 使用済み容量（バイト）
         banked_data_bytes:
           type: integer
           nullable: true
-          description: >-
-            繰越（未消化データ）残高（bytes）。`total_granted_bytes` / `total_remaining_bytes`
-            に既に含まれる内訳であり、加算しないこと。繰越の払い出し中（`filler_state != NORMAL`）は
-            0 になるが、総枠・残量は繰越分を含んだままなので表示は不連続にならない。capacity プランのみ
+          description: 繰越データ（バイト、対応プランのみ）
         filler_state:
           type: string
           enum: [NORMAL, FILLER_LARGE, FILLER_SMALL]
-          description: Filler 状態。UI が「枯渇」と低速モードを区別する補助情報
-        checked_at:
-          type: string
-          format: date-time
-          description: 残量を確認した時刻（UTC、RFC 3339 / `...Z` 形式）
-        latest_record_time:
-          type: string
-          format: date-time
-          nullable: true
-          description: >-
-            残量算出に使った使用量データの最新記録時刻（UTC、RFC 3339 / `...Z` 形式）。
-            通信実績が無い SIM や、使用量を参照しない状態（総枠未確定など）では `null`。
-            daily プランでは当日分の集計に使った最新実績の時刻を返す
-        daily_limit_bytes:
-          type: integer
-          nullable: true
-          description: >-
-            1 日あたりの上限（bytes）。daily プランのみ。
-            日次上限のないプラン（無制限）、リセット周期が 1 日でないプラン、
-            およびプラン情報から上限を判定できない場合は `null`
-        daily_used_bytes:
-          type: integer
-          nullable: true
-          description: >-
-            当日利用量（bytes）。**日本時間 0:00 以降**の実績の合計で、日付が変わると 0 に戻る。
-            daily プランのみ。通信実績が無い SIM は `0`
-        daily_remaining_bytes:
-          type: integer
-          nullable: true
-          description: >-
-            当日残量（bytes）＝ `daily_limit_bytes − daily_used_bytes`（0 未満にはならない）。
-            daily プランのみ。`daily_limit_bytes` が `null` の場合は `null`
+          description: |
+            残量閾値による前倒し実行状態。`NORMAL` は通常、
+            `FILLER_LARGE` / `FILLER_SMALL` は前倒し実行が発火する状態。
 
     Plan:
       type: object
@@ -1221,17 +1798,17 @@ components:
 
     CreateReservationRequest:
       type: object
-      required: [sim_id, plan_code]
+      required: [plan_code]
       description: |
-        `sim_id` 必須。後方互換のため `iccid` も受け付けます（両指定 + 異なる値は 400）。
+        `iccid` または `sim_id` のいずれか必須。両指定 + 異なる値、または両欠落は 400 を返します。両指定 + 同値は許容。
       properties:
-        sim_id:
-          type: string
-          description: 対象 SIM の SIM ID（ICCID）
         iccid:
           type: string
-          description: "（後方互換）対象 SIM の ICCID。`sim_id` の使用を推奨"
           deprecated: true
+          description: 対象 SIM の ICCID
+        sim_id:
+          type: string
+          description: SIM ID（ICCID のエイリアス）
         plan_code:
           type: string
           description: リチャージプランコード
@@ -1257,25 +1834,24 @@ components:
         - $ref: "#/components/schemas/Reservation"
         - type: object
           properties:
-            sim_id:
+            iccid:
               type: string
-              description: SIM の一意識別子（ICCID）
             plan_code:
               type: string
 
     ImmediateRechargeRequest:
       type: object
-      required: [sim_id, plan_code]
+      required: [plan_code]
       description: |
-        `sim_id` 必須。後方互換のため `iccid` も受け付けます（両指定 + 異なる値は 400）。
+        `iccid` または `sim_id` のいずれか必須。両指定 + 異なる値、または両欠落は 400 を返します。両指定 + 同値は許容。
       properties:
-        sim_id:
-          type: string
-          description: 対象 SIM の SIM ID（ICCID、19-20 桁）
         iccid:
           type: string
-          description: "（後方互換）対象 SIM の ICCID。`sim_id` の使用を推奨"
           deprecated: true
+          description: 対象 SIM の ICCID（19-20 桁）
+        sim_id:
+          type: string
+          description: SIM ID（ICCID のエイリアス）
         plan_code:
           type: string
           description: 書き換え先プランコード（容量型のみ）
@@ -1291,9 +1867,8 @@ components:
       description: |
         即時リチャージ結果。成功時は `status='Executed'` で `reservation_id` 等が埋まる。
       properties:
-        sim_id:
+        iccid:
           type: string
-          description: SIM の一意識別子（ICCID）
         plan_code:
           type: string
         status:
@@ -1353,6 +1928,20 @@ components:
   responses:
     BadRequest:
       description: バリデーションエラー
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: 認可情報が伴わないリクエスト
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: |
+        認証スコープ外の要求。
+        `customer_code` に認証情報と異なる顧客コードを指定した場合、または認証情報に顧客スコープが無い場合。
       content:
         application/json:
           schema:
