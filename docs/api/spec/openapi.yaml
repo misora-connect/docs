@@ -804,7 +804,6 @@ paths:
                 reservation_id: "a1XRB000005P7Q12AK"
                 sync_status: 実行中
                 superseded_reservation_ids: []
-                error_code: null
                 message: "Immediate recharge executed. PCRF sync triggered."
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -1235,7 +1234,9 @@ components:
     ImmediateRechargeResponse:
       type: object
       description: |
-        即時リチャージ結果。成功時は `status='Executed'` で `reservation_id` 等が埋まる。
+        即時リチャージ結果（成功時）。`status='Executed'` で `reservation_id` 等が埋まる。
+        エラー時はこのスキーマではなく `Error`（`detail` にオブジェクト）を返すため、
+        成功応答に `error_code` フィールドは含まれない。
       properties:
         sim_id:
           type: string
@@ -1259,9 +1260,6 @@ components:
           items:
             type: string
           description: force で Cancelled 化した既存 Reserved 予約 ID
-        error_code:
-          type: string
-          nullable: true
         message:
           type: string
 
@@ -1286,7 +1284,15 @@ components:
     Error:
       type: object
       description: |
-        エラー応答。`detail` の中の `errorCode` / `message` はキャメルケースです。
+        エラー応答。`detail` は 2 形式のいずれかで、クライアントは両方を扱う必要があります。
+
+        - **文字列** — SIMs / Stats / Exports、および Recharges のパラメータ検証エラー
+        - **オブジェクト** — Recharges のうちリチャージサービスへ委譲するエンドポイント
+          （残量取得・プラン一覧・予約の作成/一覧・即時リチャージ）。
+          中の `errorCode` / `message` はキャメルケースです
+
+        API キーが不正・未指定の場合は API Gateway が応答するため、`detail` を持たない
+        `{"message": "Forbidden"}` が返ります。
       properties:
         detail:
           oneOf:
@@ -1299,12 +1305,23 @@ components:
                     エラーコード。`BAD_REQUEST`（汎用の入力・状態エラー）/
                     `LIMIT_EXCEEDED`（予約上限到達）/ `PLAN_MISMATCH`（プラン不整合）/
                     `REALM_MISMATCH`（レルム不整合）/ `FORBIDDEN`（権限なし）/
-                    `NOT_FOUND`（対象なし）/ `VALIDATION_ERROR`（リクエストボディ不正）
+                    `NOT_FOUND`（対象なし）/ `VALIDATION_ERROR`（リクエストボディ不正）。
+                    即時リチャージはこれとは別系統で `INVALID_REQUEST` / `INVALID_ICCID` /
+                    `INVALID_PLAN` / `REALM_MISMATCH` / `FORBIDDEN_TENANT` / `NOT_FOUND` /
+                    `ALREADY_SYNCING` / `RESERVATION_EXISTS` / `EXECUTION_FAILED` /
+                    `USAGE_UNAVAILABLE` を返します
                 message:
                   type: string
                   description: |
                     エラーの詳細。同じ `errorCode` でも条件により内容が異なります
                     （例: 解約済み SIM への予約は `BAD_REQUEST` + `SIM is terminated`）
+                errors:
+                  type: array
+                  items:
+                    type: object
+                  description: |
+                    `errorCode` が `VALIDATION_ERROR` のときのみ。`message` の代わりに
+                    リクエストボディの不正箇所の配列が入ります
 
   responses:
     BadRequest:

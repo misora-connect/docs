@@ -848,7 +848,6 @@ SIM データのエクスポートをリクエストします。
   "reservation_id": "a1XRB000005P7Q12AK",
   "sync_status": "実行中",
   "superseded_reservation_ids": [],
-  "error_code": null,
   "message": "Immediate recharge executed. PCRF sync triggered."
 }
 ```
@@ -863,12 +862,23 @@ SIM データのエクスポートをリクエストします。
 | `reservation_id` | string \| null | 生成された予約 ID |
 | `sync_status` | string \| null | ネットワーク側への反映状況。成功直後は `実行中` で、反映完了後に `実行済` へ変わります |
 | `superseded_reservation_ids` | array | `force` により取り消した既存予約の ID |
-| `error_code` | string \| null | エラーコード（成功時は `null`） |
 | `message` | string | 処理結果メッセージ |
 
 **主要エラー**
 
-| ステータス | `error_code` | 条件 |
+エラー時のボディは成功時と形が異なり、`detail` の中に `errorCode` と `message` が入ります
+（後述の「共通エラーレスポンス」形式 B）。成功時のレスポンスに `error_code` フィールドは含まれません。
+
+```json
+{
+  "detail": {
+    "errorCode": "INVALID_PLAN",
+    "message": "Plan is not eligible for immediate recharge"
+  }
+}
+```
+
+| ステータス | `detail.errorCode` | 条件 |
 |---|---|---|
 | 400 | `INVALID_REQUEST` | 必須項目が不足している |
 | 400 | `INVALID_ICCID` | `sim_id` が未指定、または ICCID の形式が不正 |
@@ -887,18 +897,43 @@ SIM データのエクスポートをリクエストします。
 
 ## 共通エラーレスポンス
 
-すべてのエンドポイントで、次の共通形式のエラーレスポンスを返します。
+エラー応答のボディは、エンドポイントとエラーの発生箇所によって次の 2 形式のいずれかになります。
+クライアント側では両方を扱えるようにしてください。
+
+**形式 A — `detail` が文字列**
+
+SIMs / Stats / Exports の各エンドポイントと、Recharges のパラメータ検証エラーで返します。
 
 ```json
 {
-  "detail": "Error message"
+  "detail": "SIM not found"
 }
 ```
+
+**形式 B — `detail` がオブジェクト**
+
+Recharges のうちリチャージサービスへ委譲するエンドポイント（残量取得、プラン一覧、
+予約の作成・一覧、即時リチャージ）で返します。`errorCode` / `message` はキャメルケースです。
+
+```json
+{
+  "detail": {
+    "errorCode": "BAD_REQUEST",
+    "message": "SIM is terminated"
+  }
+}
+```
+
+リクエストボディ自体が不正な場合のみ、`message` の代わりに詳細の配列 `errors` が入ります
+（`errorCode` は `VALIDATION_ERROR`）。
+
+なお、API キーが不正または未指定の場合は API Gateway が応答するため、上記いずれとも異なる
+`{"message": "Forbidden"}` が返ります。
 
 | ステータスコード | 説明 |
 |---|---|
 | `400 Bad Request` | パラメータ不正（未指定、フォーマットエラー、上限超過など） |
-| `403 Forbidden` | 認証失敗 |
+| `403 Forbidden` | 認証失敗（API キー不正）、または指定したリソースへのアクセス権限がない（他社所有の SIM を指定した場合など） |
 | `404 Not Found` | 指定されたリソースが存在しない |
 | `429 Too Many Requests` | レート制限を超過。時間を置いてから再試行してください |
 | `500 Internal Server Error` | サーバー内部エラー |
