@@ -578,6 +578,8 @@ paths:
 
         - 対象期間は **JST の前日を終端とする直近 `days` 日**です。当日分は日次バッチへ未反映のため含まれません。当日分が必要な場合は `/stats/sims/{sim_id}/details` を利用してください。
         - **通信のない日も 0 バイトの行として返却**されるため、実績のある SIM なら常に `days` 件が返ります。
+        - **期間を明示したい場合は `start_date` / `end_date`（`YYYY-MM-DD`, JST）を指定**します（`days` と同時指定は 400）。片方だけの指定は 400 です。`end_date` は集計終端の **JST 前日にクランプ**されるため、本日や未来日を指定してもエラーにならず、前日までの行が返ります。`start_date` は JST 前日以前で、かつ今日から 31 日以内の日付である必要があります。
+        - `from` / `to` クエリは受け付けません（400）。命名はリポジトリ規約に合わせて `start_date` / `end_date` を使ってください。
         - **404 になるのは、指定 `customer_code` 配下に当該 SIM の通信実績レコードが 1 件も存在しない場合**です。SIM 自体は存在しても一度も通信していなければ 404 になります。「SIM が存在しない」ことの判定には使えません。
         - `data_through` は日次集計が確定している最終日、`checked_at` は集計を実行した時刻です。本 API の他の日時と同様に **UTC 表記（`...Z`）** で返ります。
 
@@ -616,12 +618,37 @@ paths:
         - name: days
           in: query
           required: false
-          description: 取得する日数（前日を終端とする直近 N 日）
+          description: |
+            取得する日数（JST 前日を終端とする直近 N 日）。
+            `start_date` / `end_date` と同時指定はできません（400）。
           schema:
             type: integer
             default: 3
             minimum: 1
             maximum: 31
+        - name: start_date
+          in: query
+          required: false
+          description: |
+            期間の開始日（JST, `YYYY-MM-DD`）。`end_date` と一組で指定してください。
+            `days` との同時指定・片方だけの指定は 400 です。
+            **JST 本日以降、`end_date` より後、および今日から 31 日を超えて過去の日は 400** になります
+            （集計終端は JST 前日のため、本日以降を指定しても意味のある結果が返らないので誤解を招く 404 ではなく 400 で弾きます）。
+            形式は `YYYY-MM-DD` のみ受け付けます (basic 形式 `20260821` や週日付 `2026-W34-1` は 400)。
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: false
+          description: |
+            期間の終了日（JST, `YYYY-MM-DD`）。`start_date` と一組で指定してください。
+            集計終端は常に JST 前日のため、**本日以降を指定すると JST 前日にクランプ**されます（エラーにはしません）。
+            これにより「過去 1 か月 (`start_date = today - 31`, `end_date = today`)」のような素直な指定も通ります。
+            形式は `YYYY-MM-DD` のみ受け付けます。
+          schema:
+            type: string
+            format: date
         - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
@@ -661,6 +688,8 @@ paths:
           description: |
             クエリパラメータの型変換エラー (例: `days=abc`)。
             FastAPI が範囲チェックより先に型変換を実行するため、`days` に整数化できない値を渡すと 400 ではなく 422 を返します。
+            なお `start_date` / `end_date` は文字列で受けてアプリ側でパースするため、
+            形式不正 (例: `start_date=abc`) は 422 ではなく **400** になります。
           content:
             application/json:
               schema:
@@ -1674,9 +1703,14 @@ components:
         checked_at:
           type: string
           format: date-time
+          example: "2026-08-14T06:45:49Z"
+          description: この値を算出した時刻（UTC・秒精度）
         latest_record_time:
           type: string
           format: date-time
+          nullable: true
+          example: "2026-08-14T06:40:00Z"
+          description: 集計に含まれた最新の通信記録の時刻（UTC・秒精度）
         plan_code:
           type: string
           nullable: true
