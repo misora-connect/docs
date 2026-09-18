@@ -25,58 +25,72 @@ SIM の一覧を取得します。
 |---|---|---|---|---|
 | `limit` | integer | No | 100 | 取得件数（最大 1,000） |
 | `offset` | integer | No | 0 | 取得開始位置 |
-| `order_by` | string | No | `sim_id` | ソートキー。`sim_id` / `status` / `created_at` / `updated_at` |
+| `order_by` | string | No | `sim_id` | ソートキー。`sim_id` / `customer_code` / `status` |
 | `order_direction` | string | No | `asc` | ソート方向。`asc` / `desc` |
 | `include_terminated` | boolean | No | `false` | 解約済み SIM を含めるか |
 | `filter_nulls` | boolean | No | `true` | null フィールドをレスポンスから除外するか |
+
+`sim_id` / `msisdn` の前方一致による絞り込みなど、すべてのパラメータは [OpenAPI Spec](spec/) を参照してください。
 
 **レスポンス** `200 OK`
 
 ```json
 [
   {
-    "sim_id": "sim-001",
-    "customer_code": "110139801",
-    "iccid": "8981100000000000001",
-    "imsi": "440101234567890",
-    "msisdn": "09012345678",
+    "sim_id": "8981080000000012345",
+    "customer_code": "110000001",
+    "imsi": "440090000000001",
+    "msisdn": "812000000001",
+    "tel": "02000000001",
     "status": "active",
     "session_status": "online",
-    "apn": "misora.io",
-    "active_plan_name": "plan-s",
-    "product_name": "IoT Plan S",
-    "sim_category": "iot",
-    "ip_address": "10.0.0.1",
-    "ip_address_type": "static",
-    "opening_date": "2025-01-15",
-    "line_status_from_mc": "active",
-    "created_at": "2025-01-15T00:00:00Z",
-    "updated_at": "2026-06-16T00:00:00Z"
+    "session_created_at": "2026-08-18T22:54:11Z",
+    "apn": "example.invalid",
+    "active_plan_name": "5GB/月 ライト/フル 制限時256kbps",
+    "sim_category": "マルチSIM",
+    "ip_address": "192.0.2.1",
+    "ip_address_type": "動的IP",
+    "opening_date": "2026-01-06",
+    "puk1": "12345678",
+    "password": "example-password",
+    "lines_state_ss_for_mypage": "開通",
+    "product_code": "EXAMPLE-001",
+    "sim_stock_status": "黒"
   }
 ]
 ```
 
-**SIM オブジェクトのフィールド**
+（例は主なフィールドのみ抜粋しています）
+
+**SIM オブジェクトの主なフィールド**
 
 | フィールド | 型 | 説明 |
 |---|---|---|
-| `sim_id` | string | SIM の一意識別子 |
-| `customer_code` | string | カスタマーコード |
-| `iccid` | string | IC カード識別番号 |
-| `imsi` | string | 国際移動体加入者識別番号 |
-| `msisdn` | string | 電話番号 |
-| `status` | string | SIM ステータス。`active` / `suspended` / `terminated` / `ready` |
-| `session_status` | string | セッション状態。`online` / `offline` |
-| `apn` | string | Access Point Name |
-| `active_plan_name` | string | 適用中のプラン名 |
-| `product_name` | string | プロダクト名 |
-| `sim_category` | string | SIM カテゴリ |
+| `sim_id` | string | SIM 識別子。**ICCID とは限りません**（19 桁の ICCID と、英大文字 2 文字 + 数字 13 桁の識別子が混在します） |
+| `customer_code` | string | 顧客コード（9 桁） |
+| `imsi` | string | IMSI |
+| `msisdn` | string | 電話番号（国際表記） |
+| `tel` | string | 電話番号（国内表記） |
+| `status` | string | 回線状態。`stock` / `ready` / `active` / `inactive` / `terminated` / `unknown` |
+| `session_status` | string | セッション接続状態。`online` / `offline` |
+| `session_created_at` | string | 最新セッションの開始時刻（UTC） |
+| `session_terminated_at` | string | 最新セッションの終了時刻（UTC）。継続中は `null` |
+| `apn` | string | APN |
+| `active_plan_name` | string | 現在適用中のプラン名 |
+| `product_name` | string | 商品名 |
+| `sim_category` | string | SIM 種別 |
 | `ip_address` | string | IP アドレス |
 | `ip_address_type` | string | IP アドレス種別 |
 | `opening_date` | string | 開通日 |
-| `line_status_from_mc` | string | MC 上の回線ステータス |
-| `created_at` | string | 作成日時（ISO 8601） |
-| `updated_at` | string | 更新日時（ISO 8601） |
+| `puk1` | string | PUK1（PIN ロック解除コード）。**取り扱いにご注意ください** |
+| `password` | string | APN 認証のパスワード。`apn` と対で使います。**取り扱いにご注意ください** |
+| `lines_state_ss_for_mypage` | string | 回線状態（マイページの表示値）。画面表示にはこちらを使ってください |
+| `product_code` | string | 商品コード |
+| `sim_stock_status` | string | SIM 状態（`白` / `半黒` / `黒`）。回線状態の `status` とは別物です |
+
+すべてのフィールド（44 項目）と各フィールドの詳細は [OpenAPI Spec](spec/) の `Sim` スキーマを参照してください。
+
+`puk1` / `password` は 2026 年 9 月の更新で返すようになりました。
 
 **エラーレスポンス**
 
@@ -101,7 +115,13 @@ SIM の一覧を取得します。
 
 **レスポンス** `200 OK`
 
-SIM オブジェクト（単体）。フィールドは一覧取得と同一です。
+SIM オブジェクト（単体）。一覧取得のフィールドに加えて、次のフィールドを返します。
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `note` | string | 備考。備考が無い SIM では `filter_nulls=true`（既定）ならキーごと省略、`filter_nulls=false` なら `null` |
+
+`note` は SIM 明細でのみ返り、一覧取得と CSV エクスポートには含まれません。
 
 **エラーレスポンス**
 
@@ -121,12 +141,29 @@ SIM のステータス別サマリーを取得します。
 
 ```json
 {
-  "total": 150,
-  "active": 120,
-  "suspended": 25,
-  "terminated": 5
+  "customer_code": "110000001",
+  "total": 439,
+  "subscribed": 426,
+  "ready": 330,
+  "active": 2,
+  "online": 16,
+  "terminated": 13,
+  "unknown": 94,
+  "updated_at": "2026-08-12T15:04:31Z"
 }
 ```
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `customer_code` | string | 顧客コード |
+| `total` | integer | 全件 |
+| `subscribed` | integer | 解約以外（在庫・停止を含む） |
+| `ready` | integer | 開通済みで出荷済み |
+| `active` | integer | 稼働中 |
+| `online` | integer | セッション接続中 |
+| `terminated` | integer | 解約済み |
+| `unknown` | integer | 上記のいずれにも該当しない |
+| `updated_at` | string\|null | 集計元データの最終更新時刻 |
 
 ---
 
@@ -442,6 +479,34 @@ SIM のステータス別サマリーを取得します。
 
 SIM データのエクスポートをリクエストします。
 解約済み SIM はエクスポートに含まれません。
+
+**CSV の列構成**
+
+CSV は次の **41 列** を、この順で出力します（列名は SIM オブジェクトのフィールド名）。
+
+`sim_id`, `customer_code`, `application_start_date`, `cancellation_mobile_core_date`,
+`carrier_opening_date`, `carrier_withdrawal_date`, `communication_generation`,
+`dns_primary`, `dns_secondary`, `extension_end_date`, `first_communicating_date`,
+`imsi`, `ip_address`, `ip_address_type`, `line_category`, `line_status_from_mc`,
+`line_stoped_date`, `lines_status`, `linestarted_date`, `opening_date`,
+`puk1`, `password`, `msisdn`, `realm`,
+`service_category`, `use_start_expiration_date`, `shipping_date`, `apn`,
+`active_plan_name`, `product_name`, `sim_category`, `product_name_id`,
+`status`, `session_status`, `session_created_at`, `session_terminated_at`,
+`lines_state_ss_for_mypage`, `product_code`, `quotation_application_number`, `tel`,
+`sim_stock_status`
+
+`ipv6_address` / `ipv6_address_dns_primary` / `ipv6_address_dns_secondary` の 3 列は CSV には出力しません（`GET /v1/sims` の応答には含まれます）。
+
+> **2026 年 9 月の更新で列構成が変わりました**（37 列 → 41 列）。
+>
+> - ipv6 系 3 列を削除（旧 CSV の 15〜17 列目）
+> - `puk1` / `password` を `opening_date` の直後に追加
+> - `lines_state_ss_for_mypage` 以降の 5 列を末尾に追加
+>
+> 列を位置で読んでいる場合は追随してください。列名で読んでいる場合は、削除した 3 列を参照していなければ影響ありません。今後列を追加する場合は末尾に追加します。
+>
+> CSV には `puk1`（PIN ロック解除コード）と `password`（APN 認証のパスワード）が含まれます。ダウンロードしたファイルの取り扱いにご注意ください。
 
 **クエリパラメータ**
 
