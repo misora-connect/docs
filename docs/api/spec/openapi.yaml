@@ -716,6 +716,11 @@ paths:
       description: |
         SIM に対するリチャージ予約を作成します。1 つの SIM に対して最大 3 件の予約が可能です。
 
+        **受付期限** — 利用終了日の当日に限り、**19:00（JST）以降の予約は受け付けません**
+        （`400` / `BAD_REQUEST` / `Reservation is not accepted after 19:00 on the last day`）。
+        利用終了日より前であれば時刻による制限はありません。利用終了日当日に行われる
+        リチャージの実行処理（下記 20:00 / 21:00）に予約を確実に間に合わせるための締切です。
+
         **実行タイミング** — 予約したリチャージが実際に適用されるタイミングはプランタイプによって異なります。
 
         - `capacity`（容量上限型）：残データ量が 500MB 未満になった時点、または利用終了日の 21:00（JST）以降
@@ -729,7 +734,7 @@ paths:
 
         | HTTP | errorCode | 条件 |
         |---|---|---|
-        | 400 | `BAD_REQUEST` | 必須項目の不足 / SIM ID の形式不正（19-20 桁の数字）/ 存在しない・無効な `plan_code` / 解約済み SIM（`SIM is terminated`）/ リチャージ対象外プラン |
+        | 400 | `BAD_REQUEST` | 必須項目の不足 / SIM ID の形式不正（19-20 桁の数字）/ 存在しない・無効な `plan_code` / 解約済み SIM（`SIM is terminated`）/ リチャージ対象外プラン / 利用終了日当日の 19:00（JST）以降（`Reservation is not accepted after 19:00 on the last day`） |
         | 400 | `LIMIT_EXCEEDED` | 未実行（`Reserved`）の予約が上限 3 件に到達している |
         | 400 | `PLAN_MISMATCH` | 容量上限型と日次上限型の混在 / 日次上限型で 1 日あたり容量・リセット周期が現行プランと不一致 |
         | 400 | `REALM_MISMATCH` | プランのレルムが SIM の現行レルムと不一致（通信断防止のため拒否） |
