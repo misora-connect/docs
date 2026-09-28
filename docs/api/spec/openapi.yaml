@@ -172,7 +172,10 @@ paths:
       description: |
         特定の SIM の詳細情報を取得します。
 
-        応答のフィールドは `GET /v1/sims` と同一です（同じ `Sim` スキーマ）。
+        `GET /v1/sims` の全フィールドに加えて、備考 `note` を返します（`SimDetail` スキーマ）。
+        `note` は明細でのみ返り、一覧・CSV エクスポートには含まれません。
+
+        SIM 一覧と共通のフィールドについては `Sim` スキーマを参照してください。
       operationId: GetSim
       parameters:
         - name: sim_id
@@ -197,7 +200,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Sim"
+                $ref: "#/components/schemas/SimDetail"
               example:
                 sim_id: "8981080000000012345"
                 customer_code: "110000001"
@@ -228,6 +231,7 @@ paths:
                 status: "ready"
                 session_status: "online"
                 session_created_at: "2026-08-18T22:54:11Z"
+                note: "不良SIMのため交換対応済み"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -385,6 +389,7 @@ paths:
                 - sim_id: "8981080321000912770"
                   year_month: "202608"
                   msisdn: "812001004300889"
+                  tel: "02001004300889"
                   plan_name: "IoT Standard 3GB"
                   downlink_bytes: 234567890
                   uplink_bytes: 12345678
@@ -393,6 +398,7 @@ paths:
                 - sim_id: "8981080321000913322"
                   year_month: "202608"
                   msisdn: "812001004300911"
+                  tel: "02001004300911"
                   plan_name: "IoT Standard 3GB"
                   downlink_bytes: 15667981
                   uplink_bytes: 900000
@@ -578,6 +584,8 @@ paths:
 
         - 対象期間は **JST の前日を終端とする直近 `days` 日**です。当日分は日次バッチへ未反映のため含まれません。当日分が必要な場合は `/stats/sims/{sim_id}/details` を利用してください。
         - **通信のない日も 0 バイトの行として返却**されるため、実績のある SIM なら常に `days` 件が返ります。
+        - **期間を明示したい場合は `start_date` / `end_date`（`YYYY-MM-DD`, JST）を指定**します（`days` と同時指定は 400）。片方だけの指定は 400 です。`end_date` は集計終端の **JST 前日にクランプ**されるため、本日や未来日を指定してもエラーにならず、前日までの行が返ります。`start_date` は JST 前日以前で、かつ今日から 31 日以内の日付である必要があります。
+        - `from` / `to` クエリは受け付けません（400）。命名はリポジトリ規約に合わせて `start_date` / `end_date` を使ってください。
         - **404 になるのは、指定 `customer_code` 配下に当該 SIM の通信実績レコードが 1 件も存在しない場合**です。SIM 自体は存在しても一度も通信していなければ 404 になります。「SIM が存在しない」ことの判定には使えません。
         - `data_through` は日次集計が確定している最終日、`checked_at` は集計を実行した時刻です。本 API の他の日時と同様に **UTC 表記（`...Z`）** で返ります。
 
@@ -616,12 +624,37 @@ paths:
         - name: days
           in: query
           required: false
-          description: 取得する日数（前日を終端とする直近 N 日）
+          description: |
+            取得する日数（JST 前日を終端とする直近 N 日）。
+            `start_date` / `end_date` と同時指定はできません（400）。
           schema:
             type: integer
             default: 3
             minimum: 1
             maximum: 31
+        - name: start_date
+          in: query
+          required: false
+          description: |
+            期間の開始日（JST, `YYYY-MM-DD`）。`end_date` と一組で指定してください。
+            `days` との同時指定・片方だけの指定は 400 です。
+            **JST 本日以降、`end_date` より後、および今日から 31 日を超えて過去の日は 400** になります
+            （集計終端は JST 前日のため、本日以降を指定しても意味のある結果が返らないので誤解を招く 404 ではなく 400 で弾きます）。
+            形式は `YYYY-MM-DD` のみ受け付けます (basic 形式 `20260821` や週日付 `2026-W34-1` は 400)。
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: false
+          description: |
+            期間の終了日（JST, `YYYY-MM-DD`）。`start_date` と一組で指定してください。
+            集計終端は常に JST 前日のため、**本日以降を指定すると JST 前日にクランプ**されます（エラーにはしません）。
+            これにより「過去 1 か月 (`start_date = today - 31`, `end_date = today`)」のような素直な指定も通ります。
+            形式は `YYYY-MM-DD` のみ受け付けます。
+          schema:
+            type: string
+            format: date
         - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
@@ -661,6 +694,104 @@ paths:
           description: |
             クエリパラメータの型変換エラー (例: `days=abc`)。
             FastAPI が範囲チェックより先に型変換を実行するため、`days` に整数化できない値を渡すと 400 ではなく 422 を返します。
+            なお `start_date` / `end_date` は文字列で受けてアプリ側でパースするため、
+            形式不正 (例: `start_date=abc`) は 422 ではなく **400** になります。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Snowflake 未設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /stats/sims/{sim_id}/daily_usage/export:
+    get:
+      tags: [Statistics]
+      summary: SIM 別日次通信量 CSV エクスポート
+      description: |
+        `GET /v1/stats/sims/{sim_id}/daily_usage` と同じデータを CSV でエクスポートし、
+        S3 に配置してプリサインド URL を返します（同期・24 時間有効）。
+
+        - **期間指定 (`start_date` / `end_date`) は必須**です。`days` 指定はできません。
+          期間の規則は同期 EP と同一で、**`start_date` は JST 前日以前かつ今日から 31 日以内**、
+          `end_date` は集計終端の JST 前日にクランプされます。詳細は同期 EP の description を参照。
+        - **0 件でも 200 + ヘッダのみ CSV を返します**（同期 EP は 404）。ダウンロード URL が
+          必ず返る運用にするため。仕様の非対称は意図的です。
+        - `data_through` は応答 JSON に**1 度だけ**含めます（全行同値のため CSV 列に持たせません）。
+          0 件の場合は `null` になります。
+        - **時計ずれ検出は同期 EP と同じ**で、期待行数を下回ると **500** を返します。
+          「実績なし」の空 CSV に化けないようにするための保険で、リトライで解消します。
+        - `days` / `from` / `to` クエリは受け付けません（400）。
+        - 日次データは統計基盤側で生成するため `/v1/stats/` 配下に置いています。
+
+        ### CSV 列 (英字ヘッダ、date 降順)
+
+        ```
+        date,sim_id,msisdn,uplink_bytes,downlink_bytes,total_bytes,is_confirmed
+        ```
+
+        - `is_confirmed` は `true` / `false` 文字列です。
+        - `sim_id` を含めるのは CSV を単体で扱っても対象 SIM が特定できるようにするためです。
+      operationId: ExportSimDailyUsage
+      parameters:
+        - name: sim_id
+          in: path
+          required: true
+          description: SIM 識別子
+          schema:
+            type: string
+        - name: start_date
+          in: query
+          required: true
+          description: |
+            期間の開始日（JST, `YYYY-MM-DD`）。同期 EP と同じ規則で、
+            JST 本日以降・`end_date` より後・今日から 31 日超の日は 400。
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          description: |
+            期間の終了日（JST, `YYYY-MM-DD`）。集計終端は JST 前日なので、
+            本日・未来を指定しても JST 前日にクランプされます。
+          schema:
+            type: string
+            format: date
+        - name: format
+          in: query
+          required: false
+          description: 出力フォーマット（当面 `csv` のみ）。
+          schema:
+            type: string
+            enum: [csv]
+            default: csv
+        - $ref: "#/components/parameters/CustomerCode"
+      responses:
+        "200":
+          description: 成功（CSV を S3 に配置しダウンロード URL を返す。0 件でも 200 + ヘッダのみ CSV）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimDailyUsageExport"
+              example:
+                file_name: "daily_usage_110139801_8981080301013111404_20260801_20260824_0f1e2d3c4b5a6978a9bcdef012345678.csv"
+                row_count: 24
+                download_url: "https://mc-prod-exports.s3.ap-northeast-1.amazonaws.com/daily_usage_...?X-Amz-Signature=..."
+                expires_in_seconds: 86400
+                data_through: "2026-08-24"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          description: |
+            サーバー内部エラー。**期間指定時に API と Snowflake の「今日」が JST 00:00 を跨いでずれた**
+            ときも 500 を返します（詳細メッセージ: `Clock skew detected between API and Snowflake; please retry`）。
+            リトライで解消します。
           content:
             application/json:
               schema:
@@ -712,8 +843,6 @@ paths:
       summary: 累積通信量
       description: |
         特定 SIM の累積通信量を取得します。日次で更新されます。
-
-        ⚠️ **Snowflake 未設定時の RDS フォールバック経路では、SIM 再発行月の `合計行`（旧 + 新 の合算行）を除外せずに `SUM()` しています**。該当月分が二重計上されます。集計 EP の `/v1/stats/sims/monthly_usage` は除外済みで、**本 EP は未対応**という非対称が残っています（本 PR のスコープ外。[#110](https://github.com/misora-connect/mc-api/issues/110) で追跡）。
       operationId: GetSimCumulativeUsage
       parameters:
         - name: sim_id
@@ -745,6 +874,12 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+        "503":
+          description: Snowflake 未設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   # ===== Exports =====
   /exports:
@@ -766,7 +901,7 @@ paths:
                     items:
                       type: string
               example:
-                exports: ["sims"]
+                exports: ["sims", "monthly_usage_by_sim"]
 
   /exports/sims:
     post:
@@ -779,6 +914,33 @@ paths:
         - **同期モード**: 処理完了まで待機します。
 
         解約済み SIM は除外されます。
+
+        CSV は以下の **41 列** を、この順で出力します（列名は `Sim` スキーマのフィールド名）。
+
+        `sim_id`, `customer_code`, `application_start_date`, `cancellation_mobile_core_date`,
+        `carrier_opening_date`, `carrier_withdrawal_date`, `communication_generation`,
+        `dns_primary`, `dns_secondary`, `extension_end_date`, `first_communicating_date`,
+        `imsi`, `ip_address`, `ip_address_type`, `line_category`, `line_status_from_mc`,
+        `line_stoped_date`, `lines_status`, `linestarted_date`, `opening_date`,
+        `puk1`, `password`, `msisdn`, `realm`,
+        `service_category`, `use_start_expiration_date`, `shipping_date`, `apn`,
+        `active_plan_name`, `product_name`, `sim_category`, `product_name_id`,
+        `status`, `session_status`, `session_created_at`, `session_terminated_at`,
+        `lines_state_ss_for_mypage`, `product_code`, `quotation_application_number`, `tel`,
+        `sim_stock_status`
+
+        `Sim` スキーマのうち `ipv6_address` / `ipv6_address_dns_primary` /
+        `ipv6_address_dns_secondary` の 3 列は **CSV には出力しません**（実データで常に空のため）。
+        `GET /v1/sims` の応答には引き続き含まれます。
+
+        ⚠️ **2026-09 の更新で列構成が変わりました**（37 列 → 41 列）。
+        - ipv6 系 3 列を削除（旧 CSV の 15〜17 列目）。**それより後ろの列は位置が 3 つ前にずれます**
+        - `puk1` / `password` を `opening_date` の直後に追加。
+          **それより後ろの列は位置が 2 つ後ろにずれます**（ipv6 の削除と合わせると正味 1 つ前）
+        - `lines_state_ss_for_mypage` 以降の 5 列を末尾に追加
+
+        列名で読んでいる場合は、削除した 3 列を参照していなければ影響ありません。
+        列を位置で読んでいる場合は追随してください。今後列を足す場合は末尾に足します。
       operationId: CreateSimsExport
       parameters:
         - $ref: "#/components/parameters/CustomerCode"
@@ -820,6 +982,90 @@ paths:
                     file_size_bytes: 29151
                     s3_url: "s3://mc-prod-exports/sims_export_110139801_..."
                     download_url: "https://mc-prod-exports.s3.amazonaws.com/..."
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          description: 内部サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /exports/monthly_usage_by_sim:
+    post:
+      tags: [Exports]
+      summary: 月次利用実績 CSV エクスポート (SIM 別)
+      description: |
+        指定月の SIM 別月次利用実績を CSV でエクスポートします。misora-central の
+        US-027（月次利用実績 CSV 出力）が消費する EP です。
+
+        - **非同期モード**（デフォルト）: 即座に署名付きダウンロード URL を返却し、バックグラウンドで処理します。
+        - **同期モード**: 処理完了まで待機します。
+
+        CSV は 8 列固定・**英字ヘッダ**で以下の順に出力されます。
+
+        | 列 | 型 | 内容 |
+        | --- | --- | --- |
+        | `year_month` | string | `YYYYMM` |
+        | `sim_id` | string | 既存 SIM EP と同じ ID（ICCID とは限らない） |
+        | `msisdn` | string | 電話番号（国際表記。例 `814011001010`） |
+        | `tel` | string | 電話番号（国内表記。例 `04011001010`）。値が無い場合は空欄（本番実測で 12.4%） |
+        | `reissue_category` | string | 再発行区分。`new`（新 SIM）/ `old`（旧 SIM）/ `total`（合計行）。再発行の無い通常行は空 |
+        | `uplink_bytes` | integer | 上り通信量（生バイト、0 埋め） |
+        | `downlink_bytes` | integer | 下り通信量（生バイト、0 埋め） |
+        | `total_bytes` | integer | `uplink_bytes + downlink_bytes`（サーバ側計算） |
+
+        - 実績 0 件は 200 + ヘッダのみの CSV を返します（「その月に実績が無い」は正常な結果）。
+        - 再発行月は「旧 SIM / 新 SIM / 合計」の 3 行が並びます。`exclude_total=true` を渡すと Salesforce が入れる合計行（`reissue_category='total'`）を除外できます。
+      operationId: CreateMonthlyUsageBySimExport
+      parameters:
+        - $ref: "#/components/parameters/CustomerCode"
+        - name: year_month
+          in: query
+          required: true
+          description: 対象月 `YYYYMM`（6 桁）
+          schema:
+            type: string
+            pattern: '^\d{6}$'
+          example: "202608"
+        - name: exclude_total
+          in: query
+          description: |
+            Salesforce が再発行月に入れる合計行（`reissue_category='total'`）を除外します。
+            旧 SIM 行と新 SIM 行はそのまま残ります。既定 `false`。
+          schema:
+            type: boolean
+            default: false
+        - name: format
+          in: query
+          description: 出力形式（CSV のみ）
+          schema:
+            type: string
+            default: csv
+            enum: [csv]
+        - name: async
+          in: query
+          description: "`true`: 非同期処理（即時レスポンス）、`false`: 同期処理（完了待ち）"
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ExportAsync"
+                  - $ref: "#/components/schemas/ExportSync"
+              examples:
+                async:
+                  summary: 非同期レスポンス
+                  value:
+                    file_name: "monthly_usage_by_sim_110139801_202608_01KABHF5NQGE8S4AT877421K6J.csv"
+                    download_url: "https://mc-prod-exports.s3.amazonaws.com/..."
+                    message: "Export is being processed. The file will be available shortly at the download URL."
+                    expires_in_seconds: 86400
         "400":
           $ref: "#/components/responses/BadRequest"
         "500":
@@ -1253,7 +1499,10 @@ components:
     Sim:
       type: object
       description: |
-        `GET /v1/sims` / `GET /v1/sims/{sim_id}` の応答。`mc_sims` ビューの 37 列に対応する。
+        `GET /v1/sims` の応答。`mc_sims` ビューの 44 列に対応する
+        （ビューは 46 列で、うち `activation_code` / `puk2` の 2 列は API・CSV とも出力しない。
+        `puk1` / `password` は 2026-09 の更新で出力するようになりました）。
+        明細 `GET /v1/sims/{sim_id}` は、これに `note` と `user_id` を足した `SimDetail` を返す。
 
         `filter_nulls=true`（既定）のとき、値が null のフィールドは **キーごと応答から消える**
         （`null` として返るのではない）。`nullable: true` が効くのは `filter_nulls=false` のとき。
@@ -1356,6 +1605,18 @@ components:
           format: date
           nullable: true
           description: 開通日
+        puk1:
+          type: string
+          nullable: true
+          description: |
+            PUK1（PIN ロック解除コード）。SIM の PIN を 3 回連続で誤入力してロックした際の
+            解除に使います。**取り扱いにご注意ください。**
+        password:
+          type: string
+          nullable: true
+          description: |
+            APN 認証のパスワード。APN 設定時に `apn` と対で使います。
+            **取り扱いにご注意ください。**
         msisdn:
           type: string
           description: 電話番号。実データでは 11% が空文字
@@ -1427,7 +1688,82 @@ components:
           description: |
             最新セッションの終了時刻（UTC・秒精度）。セッションが継続中、または
             セッション履歴が無い場合は `null`。
+        lines_state_ss_for_mypage:
+          type: string
+          example: "未開通"
+          description: |
+            回線状態（Salesforce `LinesStateSSForMypage__c`）。回線種別で分岐する数式項目で、
+            Magic マイページが表示している値そのものです。**画面表示にはこちらを使ってください。**
 
+            ⚠️ `lines_status` とは一致しません。mih sandbox の実測（2026-09-15）では
+            SIM 138 件中 71 件（51%）で `lines_status='開通'` に対して本項目が `未開通` でした。
+
+            本番実測（2026-09-16・207 万行）では `null` も空文字もゼロ件で、常に値が入ります。
+        product_code:
+          type: string
+          example: "MC-PLAN-001"
+          description: |
+            商品コード（Salesforce `productCode__c`）。
+
+            値が無い場合は**空文字**が返ります（`null` にはなりません）。
+            本番実測（2026-09-16）で 15.8% が空文字。
+        quotation_application_number:
+          type: string
+          example: "Q-2026-000123"
+          description: |
+            見積・申込番号（Salesforce `QuotationApplicationNumber__c`）。
+
+            値が無い場合は**空文字**が返ります（`null` にはなりません）。
+            本番実測（2026-09-16）で 15.8% が空文字。
+        tel:
+          type: string
+          nullable: true
+          example: "04011001010"
+          description: |
+            電話番号の**国内表記**（Salesforce `tel__c`）。
+            `msisdn` は同じ番号の国際表記（例 `814011001010`）で、両方返ります。
+
+            ⚠️ SIM の突き合わせや前方一致検索（`?msisdn=`）には `msisdn` を使ってください。
+
+            ⚠️ **必須キーとして扱わないでください。** 本番実測（2026-09-16・207 万行）で
+            **12.4%（約 25 万 SIM）が `null`** です（空文字はゼロ件）。
+            `filter_nulls=true`（既定）ではこれらの SIM で**キーごと落ちます**。
+            `filter_nulls=false` なら `null` が返ります。
+        sim_stock_status:
+          type: string
+          nullable: true
+          example: "白"
+          description: |
+            SIM 状態（Salesforce `status__c`。`白` / `半黒` / `黒`）。
+
+            ⚠️ 回線状態を表す `status`（`active` / `ready` / …）とは**別物**です。
+            CSV エクスポートでも両方の列が並ぶため、列名を分けています。
+
+            本番実測（2026-09-16）で 0.14% が `null`（空文字はゼロ件）。
+            `filter_nulls=true`（既定）ではキーごと落ちます。
+
+    SimDetail:
+      description: |
+        `GET /v1/sims/{sim_id}` の応答。`Sim` の全フィールドに加えて `note` を返す。
+
+        `note` は明細でのみ返る。`GET /v1/sims`（一覧）と CSV エクスポートには
+        含まれない（#57）。自由記述の備考を顧客向け CSV に混ぜないため、
+        明細専用のビュー `mc_sim_detail` に分けている。
+      allOf:
+        - $ref: "#/components/schemas/Sim"
+        - type: object
+          properties:
+            note:
+              type: string
+              nullable: true
+              maxLength: 255
+              example: "不良SIMのため交換対応済み"
+              description: |
+                備考。単一の上書き型メモで、履歴・作成者・更新時刻は持たない。
+
+                備考が無い SIM では `filter_nulls=true`（既定）なら **キーごと落ち**、
+                `filter_nulls=false` なら `null` が返る。どちらも「備考なし」を意味し、
+                クライアントは両者を区別しない。**空文字は返らない**（空は `null` に寄せる）。
     SimCount:
       type: object
       description: |
@@ -1498,6 +1834,15 @@ components:
               type: string
             customer_code:
               type: string
+            tel:
+              type: string
+              nullable: true
+              example: "04011001010"
+              description: |
+                電話番号の国内表記（`sf.inventory.tel__c`）。
+
+                ⚠️ 本 EP は `mc_stats_monthly` を `SELECT *` で読むため、ビューに列が
+                増えると応答も増えます。ここに挙げていない列が返ることがあります。
             last_updated_at:
               type: string
               format: date-time
@@ -1531,7 +1876,18 @@ components:
         msisdn:
           type: string
           nullable: true
-          description: "sf.inventory.MSISDN__c は NULL 可 (dev 実測 7%)。"
+          description: "sf.inventory.MSISDN__c は NULL 可 (dev 実測 7%)。国際表記 (例 814011001010)。"
+        tel:
+          type: string
+          nullable: true
+          example: "04011001010"
+          description: |
+            電話番号の**国内表記**（`sf.inventory.tel__c`）。`msisdn` は同じ番号の国際表記で、
+            両方返ります。
+
+            ⚠️ **必須キーとして扱わないでください。** `sf.inventory.tel__c` 自体が
+            本番実測（2026-09-16・207 万行）で 12.4% `null` であるうえ、view は
+            LEFT JOIN なので参照先の行が無い場合も `null` になります。
         plan_name:
           type: string
           nullable: true
@@ -1594,6 +1950,40 @@ components:
           type: string
           format: date
           description: 日次集計が確定している最終日
+
+    SimDailyUsageExport:
+      type: object
+      description: |
+        `GET /v1/stats/sims/{sim_id}/daily_usage/export` の応答。CSV 本体は
+        `download_url` からダウンロードします。
+      required:
+        - file_name
+        - row_count
+        - download_url
+        - expires_in_seconds
+        - data_through
+      properties:
+        file_name:
+          type: string
+          description: S3 に配置したファイル名。
+        row_count:
+          type: integer
+          minimum: 0
+          description: CSV のデータ行数 (ヘッダ行を除く)。0 のときはヘッダのみ。
+        download_url:
+          type: string
+          format: uri
+          description: プリサインド URL (S3 GetObject)。
+        expires_in_seconds:
+          type: integer
+          description: プリサインド URL の有効秒数。
+        data_through:
+          type: string
+          format: date
+          nullable: true
+          description: |
+            日次集計が確定している最終日。全行同値のため CSV 列でなく本フィールドに 1 度だけ含めます。
+            **0 件のときは `null`**（集計状態を返す情報源が無いため）。
 
     CdrRecord:
       type: object
@@ -1674,9 +2064,14 @@ components:
         checked_at:
           type: string
           format: date-time
+          example: "2026-08-14T06:45:49Z"
+          description: この値を算出した時刻（UTC・秒精度）
         latest_record_time:
           type: string
           format: date-time
+          nullable: true
+          example: "2026-08-14T06:40:00Z"
+          description: 集計に含まれた最新の通信記録の時刻（UTC・秒精度）
         plan_code:
           type: string
           nullable: true
