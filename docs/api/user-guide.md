@@ -286,7 +286,7 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ### 残量の確認
 
-`GET /v1/recharges/sims/{sim_id}/balance` で、現プランの総容量・残量・使用量をまとめて取得します。
+`GET /v1/recharges/sims/{sim_id}/balance` で、使える総量・残量・使用量をまとめて取得します。
 マイページ等で「◯GB 中 ◯GB 残り」を描画する用途を想定した API です。
 
 ```bash
@@ -302,16 +302,62 @@ curl -H "x-api-key: YOUR_API_KEY" \
   "total_remaining_bytes": 5368709120,
   "used_bytes": 1073741824,
   "banked_data_bytes": 1073741824,
-  "filler_state": "NORMAL"
+  "filler_state": "NORMAL",
+  "checked_at": "2026-08-26T05:30:00Z",
+  "latest_record_time": "2026-08-25T15:00:00Z",
+  "daily_limit_bytes": null,
+  "daily_used_bytes": null,
+  "daily_remaining_bytes": null
 }
 ```
 
-`total_granted_bytes` が分母、`total_remaining_bytes` が分子です。
+「◯GB 中 ◯GB 残り」の前者が `total_granted_bytes`、後者が `total_remaining_bytes` です。
 残量は `0 ≤ total_remaining_bytes ≤ total_granted_bytes` の範囲にクランプ済みなので、そのまま表示に使えます。
 
+**繰越（Banked Data）について**: 使える総量 = 現プラン容量 + 繰越（未消化分）です。
+消費順序は 現プラン → 繰越で、現プランの枯渇または期間満了時に繰越分は自動的に払い出されます
+（お客様の操作は不要で、通信は途切れません）。残量は現プランと繰越をまたいで連続して減ります。
+繰越は無期限ではなく、払い出し用の内部プランの期間終了時に消滅します。
+
+`banked_data_bytes` は繰越残高の**内訳表示**で、`total_granted_bytes` / `total_remaining_bytes` に
+**既に含まれています**。合計を出す際に加算しないでください。
+
+`checked_at` は残量を確認した時刻、`latest_record_time` は残量算出に使った使用量データの
+最新記録時刻です（いずれも UTC の `...Z` 形式）。通信実績が無い SIM では `latest_record_time` が `null` になります。
+
 容量 3 値（`total_granted_bytes` / `total_remaining_bytes` / `used_bytes`）は容量上限型プランでのみ値を持ちます。
-日次上限型プランの SIM、および総枠が未確定の SIM（初回リチャージ前など）では `null` が返るため、
+総枠が未確定の SIM（初回リチャージ前など）では `null` が返るため、
 表示側で「残量非表示」に切り替える分岐を用意してください。
+
+#### 日次上限型プラン（1GB/day 等）の当日枠
+
+日次上限型プランは通算残量の概念を持たないため、容量 3 値は `null` のままで、
+代わりに**当日の枠**を返します。
+
+```json
+{
+  "sim_id": "8981100000000000002",
+  "plan_type": "daily",
+  "total_granted_bytes": null,
+  "total_remaining_bytes": null,
+  "used_bytes": null,
+  "banked_data_bytes": null,
+  "filler_state": "NORMAL",
+  "checked_at": "2026-09-03T05:30:00Z",
+  "latest_record_time": "2026-09-03T05:18:00Z",
+  "daily_limit_bytes": 1073741824,
+  "daily_used_bytes": 268435456,
+  "daily_remaining_bytes": 805306368
+}
+```
+
+- `daily_used_bytes` は**日本時間の 0:00 以降**の実績の合計です。日付が変わると 0 に戻ります
+- `daily_remaining_bytes` は `daily_limit_bytes − daily_used_bytes` で、0 未満にはなりません
+- 日次上限のないプラン（無制限）や、リセット周期が 1 日でないプランでは
+  `daily_limit_bytes` / `daily_remaining_bytes` が `null` になり、**当日利用量のみ**が返ります
+
+レスポンスは全プランタイプで同一のスキーマです。**容量上限型プランでは `daily_*` が `null` として含まれ、
+日次上限型プランでは容量 3 値が `null` として含まれます**。`plan_type` で表示を切り替えてください。
 
 通信量の取得に失敗した場合は `503` を返します。古い値やキャッシュを返すことはありません。
 
