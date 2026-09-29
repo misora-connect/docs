@@ -765,13 +765,17 @@ daily プラン（日次型・1GB/day）:
 
 | ステータス | `errorCode` | 条件 |
 |---|---|---|
-| `400` | `BAD_REQUEST` | 必須フィールドの不足、不正な SIM ID やプランコード、解約済み SIM、リチャージ対象外プラン |
+| `400` | `BAD_REQUEST` | 不正な SIM ID やプランコード、解約済み SIM、リチャージ対象外プラン、受付期限の超過 |
 | `400` | `LIMIT_EXCEEDED` | 未実行の予約が上限（3 件）に到達している |
 | `400` | `PLAN_MISMATCH` | 容量上限型と日次上限型の混在、または日次上限型で 1 日あたり容量・リセット周期が現行プランと不一致 |
 | `400` | `REALM_MISMATCH` | プランのレルムが SIM の現行レルムと不一致 |
 | `403` | `FORBIDDEN` | アクセス権限なし |
 | `404` | `NOT_FOUND` | 指定した SIM が登録されていない |
+| `400` | `VALIDATION_ERROR` | `plan_code` の不足・型不正などリクエストボディの不正 |
 | `502` | - | 下流サービスのエラー |
+
+`sim_id` が未指定の場合と、`sim_id` と `iccid` を異なる値で両方指定した場合は、`errorCode` を持たない
+400（`detail` が文字列の形式 A。後述の「共通エラーレスポンス」を参照）になります。
 
 リチャージサービスのエラーレスポンスは次の形式です。
 
@@ -789,7 +793,6 @@ daily プラン（日次型・1GB/day）:
 
 | `message` | 条件 |
 |---|---|
-| `iccid is required` / `planCode is required` | 必須フィールドの不足 |
 | `Invalid ICCID format` | SIM ID が 19-20 桁の数字でない |
 | `Invalid planCode` | 存在しない、または有効期限切れのプランコード |
 | `SIM is terminated` | 解約済みの SIM を指定した |
@@ -834,7 +837,7 @@ daily プラン（日次型・1GB/day）:
 | パラメータ | 型 | 必須 | デフォルト | 説明 |
 |---|---|---|---|---|
 | `sim_id` | string | No | - | 特定 SIM でフィルタ |
-| `status` | string | No | - | ステータスでフィルタ。`Reserved` / `Executed` / `Failed`。大文字始まりのみ有効で、値が一致しない場合は `400`。`Cancelled` はフィルタ値として指定できません |
+| `status` | string | No | - | ステータスでフィルタ。`Reserved` / `Executed` / `Failed`。大文字始まりのみ有効で、値が一致しない場合は `400`。取り消し済み（`Cancelled`）の予約は一覧に含まれないため、フィルタ値としても指定できません |
 | `page_size` | integer | No | 200 | 1ページあたりの件数 |
 | `cursor` | string | No | - | ページネーションカーソル |
 
@@ -866,7 +869,7 @@ daily プラン（日次型・1GB/day）:
 | `reservation_id` | string | 予約 ID |
 | `sim_id` | string | SIM の一意識別子（ICCID） |
 | `plan_code` | string | プランコード |
-| `status` | string | ステータス。`Reserved`（予約済み）/ `Executed`（実行済み）/ `Failed`（失敗）/ `Cancelled`（取り消し済み） |
+| `status` | string | ステータス。`Reserved`（予約済み）/ `Executed`（実行済み）/ `Failed`（失敗）。取り消し済みの予約は一覧に含まれません |
 | `reserved_at` | string | 予約日時（ISO 8601） |
 | `executed_at` | string\|null | 実行日時（ISO 8601） |
 
@@ -982,8 +985,12 @@ Recharges のうちリチャージサービスへ委譲するエンドポイン�
 }
 ```
 
-リクエストボディ自体が不正な場合のみ、`message` の代わりに詳細の配列 `errors` が入ります
-（`errorCode` は `VALIDATION_ERROR`）。
+リクエストボディの形式が不正な場合（必須キーの欠落・型不正）のみ、`message` の代わりに詳細の配列
+`errors` が入ります（`errorCode` は `VALIDATION_ERROR`）。値が空文字の場合など、同じ `VALIDATION_ERROR`
+でも `message` で返る場合があります。
+
+`errorCode` は各エンドポイントの表に記載したもの以外に、下流サービスの障害時には `SF_AUTH_ERROR` /
+`SF_API_ERROR` / `INTERNAL_ERROR` / `UNKNOWN_ERROR` なども返ります。未知の値も扱えるようにしてください。
 
 なお、API キーが不正または未指定の場合は API Gateway が応答するため、上記いずれとも異なる
 `{"message": "Forbidden"}` が返ります。
