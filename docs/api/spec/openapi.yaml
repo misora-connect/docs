@@ -843,8 +843,6 @@ paths:
       summary: 累積通信量
       description: |
         特定 SIM の累積通信量を取得します。日次で更新されます。
-
-        ⚠️ **Snowflake 未設定時の RDS フォールバック経路では、SIM 再発行月の `合計行`（旧 + 新 の合算行）を除外せずに `SUM()` しています**。該当月分が二重計上されます。集計 EP の `/v1/stats/sims/monthly_usage` は除外済みで、**本 EP は未対応**という非対称が残っています（本 PR のスコープ外。[#110](https://github.com/misora-connect/mc-api/issues/110) で追跡）。
       operationId: GetSimCumulativeUsage
       parameters:
         - name: sim_id
@@ -876,6 +874,12 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+        "503":
+          description: Snowflake 未設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   # ===== Exports =====
   /exports:
