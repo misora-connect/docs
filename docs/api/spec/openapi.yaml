@@ -1320,10 +1320,12 @@ paths:
         - $ref: "#/components/parameters/SimIdQuery"
         - name: status
           in: query
-          description: ステータスでフィルタ
+          description: |
+            ステータスでフィルタ。大文字始まりの値のみ受け付けます（小文字を指定すると 400）。
+            取り消し済み（`Cancelled`）の予約は一覧に含まれないため、フィルタ値としても指定できません。
           schema:
             type: string
-            enum: [reserved, executed, failed]
+            enum: [Reserved, Executed, Failed]
         - $ref: "#/components/parameters/PageSize"
         - $ref: "#/components/parameters/Cursor"
       responses:
@@ -1357,12 +1359,37 @@ paths:
       description: |
         SIM に対するリチャージ予約を作成します。1つの SIM に対して最大3件の予約が可能です。
 
-        **実行タイミング**:
-        - **容量型 (capacity)**: 現在の残量が 500MB 未満、もしくは容量プラン終了日を過ぎた 21:00 JST に自動実行される。
-        - **日次型 (daily)**: 毎日 20:00 JST に当日分の枠が自動実行される。
-        - 500MB 以下の小容量プランは残量閾値を待たずに前倒し実行される場合がある。
+        **受付期限** — 利用終了日の当日に限り、**19:00（JST）以降の予約は受け付けません**
+        （`400` / `BAD_REQUEST` / `Reservation is not accepted after 19:00 on the last day`）。
+        利用終了日より前であれば時刻による制限はありません。利用終了日当日に行われる
+        リチャージの実行処理（下記 20:00 / 21:00）に予約を確実に間に合わせるための締切です。
 
-        `status` は生成時に `reserved` で、上記のタイミングに到達すると `executed` に遷移する。
+        **実行タイミング** — 予約したリチャージが実際に適用されるタイミングはプランタイプによって異なります。
+
+        - `capacity`（容量上限型）：残データ量が 500MB 未満になった時点、または利用終了日の 21:00（JST）以降
+        - `daily`（日次上限型）：利用終了日に到達後、毎日 20:00（JST）の日次処理で実行（残データ量による判定なし）
+
+        ※ 上限が 500MB 以下の小容量プランでは、上限に到達した時点で実行されます。
+
+        予約直後は `status` が `Reserved` となり、実行後に `Executed` へ変わります。
+
+        **予約できない条件** — 以下に該当する場合は予約が作成されず、`errorCode` 付きのエラーになります。
+
+        | HTTP | errorCode | 条件 |
+        |---|---|---|
+        | 400 | `BAD_REQUEST` | SIM ID の形式不正（19-20 桁の数字）/ 存在しない・無効な `plan_code` / 解約済み SIM（`SIM is terminated`）/ リチャージ対象外プラン / 利用終了日当日の 19:00（JST）以降（`Reservation is not accepted after 19:00 on the last day`） |
+        | 400 | `LIMIT_EXCEEDED` | 未実行（`Reserved`）の予約が上限 3 件に到達している |
+        | 400 | `PLAN_MISMATCH` | 容量上限型と日次上限型の混在 / 日次上限型で 1 日あたり容量・リセット周期が現行プランと不一致 |
+        | 400 | `REALM_MISMATCH` | プランのレルムが SIM の現行レルムと不一致（通信断防止のため拒否） |
+        | 403 | `FORBIDDEN` | 指定 SIM を当該顧客が所有していない |
+        | 404 | `NOT_FOUND` | 指定 SIM が登録されていない |
+        | 400 | `VALIDATION_ERROR` | `plan_code` の不足・型不正などリクエストボディの不正 |
+
+        `sim_id`（または `iccid`）が未指定の場合と、`sim_id` と `iccid` を異なる値で両方指定した場合は、
+        `errorCode` を持たない 400（`detail` が文字列）になります。
+
+        予約上限にカウントされるのは `status` が `Reserved` の予約のみです。`Executed` や取り消し済みの
+        予約は含まないため、3 件予約済みでもそのうち 1 件が実行されれば次の予約を作成できます。
       operationId: CreateRechargeReservation
       parameters:
         - $ref: "#/components/parameters/CustomerCode"
@@ -1384,11 +1411,12 @@ paths:
                 $ref: "#/components/schemas/Reservation"
               example:
                 reservation_id: "RR-00012"
-                status: 予約済み
+                status: Reserved
                 reserved_at: "2026-03-10T10:30:00Z"
-                executed_at: null
         "400":
           $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "502":
@@ -1432,7 +1460,6 @@ paths:
                 reservation_id: "a1XRB000005P7Q12AK"
                 sync_status: 実行中
                 superseded_reservation_ids: []
-                error_code: null
                 message: "Immediate recharge executed. PCRF sync triggered."
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -2355,19 +2382,21 @@ components:
 
     Reservation:
       type: object
+      description: |
+        予約作成（`POST /recharges/reservations`）の応答。`executed_at` は含まれません。
       properties:
         reservation_id:
           type: string
+          description: 予約 ID（`RR-00012` 形式）
         status:
           type: string
+          description: |
+            予約ステータス。`Reserved`（予約済み）/ `Executed`（実行済み）/
+            `Failed`（失敗）。作成直後は `Reserved`。取り消し済みの予約は一覧に含まれません
+          enum: [Reserved, Executed, Failed]
         reserved_at:
           type: string
           format: date-time
-        executed_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: 実行日時（未実行時 null）
 
     ReservationDetail:
       allOf:
@@ -2378,6 +2407,11 @@ components:
               type: string
             plan_code:
               type: string
+            executed_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: 実行日時（未実行時 null）
 
     ImmediateRechargeRequest:
       type: object
@@ -2405,7 +2439,9 @@ components:
     ImmediateRechargeResponse:
       type: object
       description: |
-        即時リチャージ結果。成功時は `status='Executed'` で `reservation_id` 等が埋まる。
+        即時リチャージ結果（成功時）。`status='Executed'` で `reservation_id` 等が埋まる。
+        エラー時はこのスキーマではなく `Error`（`detail` にオブジェクト）を返すため、
+        成功応答に `error_code` フィールドは含まれない。
       properties:
         iccid:
           type: string
@@ -2428,9 +2464,6 @@ components:
           items:
             type: string
           description: force で Cancelled 化した既存 Reserved 予約 ID
-        error_code:
-          type: string
-          nullable: true
         message:
           type: string
 
@@ -2454,6 +2487,16 @@ components:
     # ----- Common -----
     Error:
       type: object
+      description: |
+        エラー応答。`detail` は 2 形式のいずれかで、クライアントは両方を扱う必要があります。
+
+        - **文字列** — SIMs / Stats / Exports、および Recharges のパラメータ検証エラー
+        - **オブジェクト** — Recharges のうちリチャージサービスへ委譲するエンドポイント
+          （残量取得・プラン一覧・予約の作成/一覧・即時リチャージ）。
+          中の `errorCode` / `message` はキャメルケースです
+
+        API キーが不正・未指定の場合は API Gateway が応答するため、`detail` を持たない
+        `{"message": "Forbidden"}` が返ります。
       properties:
         detail:
           oneOf:
@@ -2462,8 +2505,30 @@ components:
               properties:
                 errorCode:
                   type: string
+                  description: |
+                    エラーコード。`BAD_REQUEST`（汎用の入力・状態エラー）/
+                    `LIMIT_EXCEEDED`（予約上限到達）/ `PLAN_MISMATCH`（プラン不整合）/
+                    `REALM_MISMATCH`（レルム不整合）/ `FORBIDDEN`（権限なし）/
+                    `NOT_FOUND`（対象なし）/ `VALIDATION_ERROR`（リクエストボディ不正）。
+                    即時リチャージはこれとは別系統で `INVALID_REQUEST` / `INVALID_ICCID` /
+                    `INVALID_PLAN` / `REALM_MISMATCH` / `FORBIDDEN_TENANT` / `NOT_FOUND` /
+                    `ALREADY_SYNCING` / `RESERVATION_EXISTS` / `EXECUTION_FAILED` /
+                    `USAGE_UNAVAILABLE` を返します。
+                    上記は代表的なもので網羅ではありません。下流サービスの障害時には
+                    `SF_AUTH_ERROR` / `SF_API_ERROR` / `INTERNAL_ERROR` / `UNKNOWN_ERROR` なども返ります
                 message:
                   type: string
+                  description: |
+                    エラーの詳細。同じ `errorCode` でも条件により内容が異なります
+                    （例: 解約済み SIM への予約は `BAD_REQUEST` + `SIM is terminated`）
+                errors:
+                  type: array
+                  items:
+                    type: object
+                  description: |
+                    リクエストボディの形式が不正な場合（必須キーの欠落・型不正）のみ、`message` の代わりに
+                    不正箇所の配列が入ります（`errorCode` は `VALIDATION_ERROR`）。
+                    値が空文字の場合など、同じ `VALIDATION_ERROR` でも `message` で返る場合があります
 
   responses:
     BadRequest:
@@ -2480,8 +2545,9 @@ components:
             $ref: "#/components/schemas/Error"
     Forbidden:
       description: |
-        認証スコープ外の要求。
-        `customer_code` に認証情報と異なる顧客コードを指定した場合、または認証情報に顧客スコープが無い場合。
+        認証スコープ外の要求、または指定リソースへのアクセス権限がない。
+        `customer_code` に認証情報と異なる顧客コードを指定した場合、認証情報に顧客スコープが無い場合、
+        または指定 SIM を当該顧客が所有していない場合。
       content:
         application/json:
           schema:
