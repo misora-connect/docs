@@ -175,6 +175,62 @@ curl -H "x-api-key: YOUR_API_KEY" \
 一度もリチャージを実行していない SIM では、`plan_code` や `current_plan_used_bytes` が `null` になります。
 残量をそのまま画面に出す用途では、リチャージ側の残量取得 API（後述の「残量の確認」）のほうが扱いやすい場合があります。
 
+### 多数の SIM の通信量を画面に表示する場合（一括取得のおすすめ）
+
+累積通信量（`cumulative_usage`）と現プラン消費量（`current_plan_usage`）は、呼び出しのたびに集計基盤へ問い合わせて最新値を計算します。
+そのため、SIM ごとの API は 1 回の応答に数秒かかることがあります。
+
+お客様のシステムで SIM ごとの通信量を一覧や照会画面に表示する場合は、画面を開くたびに SIM ごとの API を呼ぶのではなく、次の構成をおすすめします。
+
+1. お客様のサーバー（バッチ処理）から、**全 SIM 分を返す一括 API を定期的に呼び出す**
+2. 取得した結果をお客様のシステム側に保存する
+3. 画面には、保存しておいた値を表示する
+
+こうすると、画面の表示は API の応答時間に左右されません。また、SIM の数が増えても API の呼び出し回数は変わりません。
+
+| 用途 | 一括 API | SIM ごとの API |
+|---|---|---|
+| 累積通信量 | `GET /v1/stats/sims/cumulative_usage` | `GET /v1/stats/sims/{sim_id}/cumulative_usage` |
+| 現プラン消費量 | `GET /v1/stats/sims/current_plan_usage` | `GET /v1/stats/sims/{sim_id}/current_plan_usage` |
+
+一括 API は 1 回の呼び出しで全 SIM 分を返すため、SIM ごとに呼ぶよりも、呼び出し回数と全体の待ち時間を大きく減らせます。
+
+#### 取得間隔の目安
+
+- データは概ねリアルタイムで更新されます（最大 5 分程度の遅れがあります）。**5 分より短い間隔で取得しても、新しい値は得られません。**
+- 画面表示の用途では、**15 分〜1 時間ごと**の取得をおすすめします。
+- 画面に「◯時◯分時点」と表示する場合は、各レコードの `checked_at`（値を取得した時刻）を使ってください。`latest_record_time` はその SIM の最後の通信記録の時刻のため、しばらく通信していない SIM では古い日時になります。
+
+#### 実装例
+
+```python
+import requests
+
+API = "https://api.misora-connect.com/v1"
+HEADERS = {"x-api-key": "YOUR_API_KEY"}
+
+def sync_cumulative_usage():
+    # 30,000 件を超える場合は 302 で S3 の署名付き URL に転送されるが、
+    # requests は自動で追従し、gzip も自動で解凍する
+    resp = requests.get(f"{API}/stats/sims/cumulative_usage", headers=HEADERS, timeout=60)
+    resp.raise_for_status()
+    if resp.headers.get("Content-Type", "").startswith("application/x-ndjson"):
+        import json
+        records = [json.loads(line) for line in resp.text.splitlines() if line]
+    else:
+        records = resp.json()
+    for r in records:
+        save_usage(r["sim_id"], r["total_bytes"], r["checked_at"])  # お客様側の保存処理
+
+# 15 分ごとにスケジューラ（cron など）から sync_cumulative_usage() を呼ぶ
+```
+
+#### 注意点
+
+- 一括 API は、**お客様のサーバー側から**呼び出してください。30,000 件を超えたときの転送先（S3 の署名付き URL）は、ブラウザから直接取得する用途を想定していません。また、API キーをブラウザに置かないためでもあります。
+- 転送先の署名付き URL の有効期限は 5 分です。取得に失敗した場合は、一括 API の呼び出しからやり直してください。
+- 「今この SIM の値を確認したい」といった単発の確認には、これまでどおり SIM ごとの API を使えます。
+
 ## データエクスポート
 
 ### エクスポート可能なデータ
