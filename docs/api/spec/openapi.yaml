@@ -55,7 +55,7 @@ paths:
   /sims:
     get:
       tags: [SIM Management]
-      summary: SIM 一覧取得
+      summary: ListSims — SIM 一覧取得
       description: |
         顧客に紐づく SIM のページネーション付き一覧を取得します。
 
@@ -168,7 +168,7 @@ paths:
   /sims/{sim_id}:
     get:
       tags: [SIM Management]
-      summary: SIM 詳細取得
+      summary: GetSim — SIM 詳細取得
       description: |
         特定の SIM の詳細情報を取得します。
 
@@ -240,7 +240,7 @@ paths:
   /sims/count:
     get:
       tags: [SIM Management]
-      summary: SIM 件数取得
+      summary: CountSims — SIM 件数取得
       description: |
         `GET /v1/sims` と同じ絞り込みに一致する行数を返します。
         一覧のフィルタ時件数表示や、CSV エクスポートへ誘導するかの判定に使用します。
@@ -281,7 +281,7 @@ paths:
   /sims/summary:
     get:
       tags: [SIM Management]
-      summary: SIM サマリー取得
+      summary: GetSimsSummary — SIM サマリー取得
       description: 顧客に紐づく全 SIM の集計サマリー情報を取得します。
       operationId: GetSimsSummary
       parameters:
@@ -312,7 +312,7 @@ paths:
   /stats/sims/monthly_usage:
     get:
       tags: [Statistics]
-      summary: 月次通信量（全 SIM）
+      summary: ListMonthlyUsage — 月次通信量（全 SIM）
       description: |
         顧客の全 SIM の月次通信量集計データを取得します（直近12ヶ月分、year_month 降順）。
 
@@ -341,7 +341,7 @@ paths:
   /stats/sims/monthly_usage_by_sim:
     get:
       tags: [Statistics]
-      summary: 月次通信量（指定月・SIM 別内訳）
+      summary: GetMonthlyUsageBySim — 月次通信量（指定月・SIM 別内訳）
       description: |
         指定月に**利用実績のある SIM のみ**の通信量内訳を返します（`sim_id` 昇順）。通信のない契約中 SIM は含まれません。
 
@@ -410,9 +410,9 @@ paths:
   /stats/sims/cumulative_usage:
     get:
       tags: [Statistics]
-      summary: 全 SIM 累積通信量
+      summary: ListCumulativeUsage — 全 SIM 累積通信量
       description: |
-        顧客の全 SIM の累積通信量を一括取得します。日次で更新されます。
+        顧客の全 SIM の累積通信量を一括取得します。概ねリアルタイムで更新されます（最大 5 分のラグがあります）。
 
         30,000 件以下の場合は JSON 配列を直接返却します。
         30,000 件を超える場合は S3 にエクスポートし、署名付きダウンロード URL へ 302 リダイレクトします（NDJSON、`Content-Type: application/x-ndjson`、5分有効）。実体は gzip 圧縮されており、S3 側で `Content-Encoding: gzip` を付与するため、`curl --compressed` / requests / ブラウザなど標準的な HTTP クライアントは自動的に解凍します。
@@ -458,7 +458,7 @@ paths:
   /stats/sims/current_plan_usage:
     get:
       tags: [Statistics]
-      summary: 全 SIM 現プラン消費量
+      summary: ListCurrentPlanUsage — 全 SIM 現プラン消費量
       description: |
         顧客の全 SIM の「現プランでの消費量」を一括取得します。
 
@@ -492,7 +492,7 @@ paths:
   /stats/sims/{sim_id}/current_plan_usage:
     get:
       tags: [Statistics]
-      summary: SIM 現プラン消費量
+      summary: GetSimCurrentPlanUsage — SIM 現プラン消費量
       description: |
         特定 SIM の「現プランでの消費量」を取得します。
 
@@ -532,7 +532,7 @@ paths:
   /stats/sims/{sim_id}/monthly_usage:
     get:
       tags: [Statistics]
-      summary: SIM 別月次通信量
+      summary: GetSimMonthlyUsage — SIM 別月次通信量
       description: |
         特定 SIM の月次通信量を取得します（直近12ヶ月分、year_month 降順）。
 
@@ -578,7 +578,7 @@ paths:
   /stats/sims/{sim_id}/daily_usage:
     get:
       tags: [Statistics]
-      summary: SIM 別日次通信量
+      summary: GetSimDailyUsage — SIM 別日次通信量
       description: |
         特定 SIM の日別通信量を取得します（date 降順）。
 
@@ -710,7 +710,7 @@ paths:
   /stats/sims/{sim_id}/daily_usage/export:
     get:
       tags: [Statistics]
-      summary: SIM 別日次通信量 CSV エクスポート
+      summary: ExportSimDailyUsage — SIM 別日次通信量 CSV エクスポート
       description: |
         `GET /v1/stats/sims/{sim_id}/daily_usage` と同じデータを CSV でエクスポートし、
         S3 に配置してプリサインド URL を返します（同期・24 時間有効）。
@@ -806,7 +806,7 @@ paths:
   /stats/sims/{sim_id}/details:
     get:
       tags: [Statistics]
-      summary: SIM CDR（通信明細）
+      summary: GetSimUsageDetails — SIM CDR（通信明細）
       description: 特定 SIM の通信明細（CDR）を取得します。直近 288 件（5 分粒度。連続してデータがある場合で約 24 時間分）のレコードが返却されます。
       operationId: GetSimUsageDetails
       parameters:
@@ -840,9 +840,9 @@ paths:
   /stats/sims/{sim_id}/cumulative_usage:
     get:
       tags: [Statistics]
-      summary: 累積通信量
+      summary: GetSimCumulativeUsage — 累積通信量
       description: |
-        特定 SIM の累積通信量を取得します。日次で更新されます。
+        特定 SIM の累積通信量を取得します。概ねリアルタイムで更新されます（最大 5 分のラグがあります）。
       operationId: GetSimCumulativeUsage
       parameters:
         - name: sim_id
@@ -885,7 +885,7 @@ paths:
   /exports:
     get:
       tags: [Exports]
-      summary: エクスポート種別一覧
+      summary: ListExports — エクスポート種別一覧
       description: 利用可能なエクスポート種別の一覧を取得します。
       operationId: ListExports
       responses:
@@ -906,7 +906,7 @@ paths:
   /exports/sims:
     post:
       tags: [Exports]
-      summary: SIM データエクスポート
+      summary: CreateSimsExport — SIM データエクスポート
       description: |
         SIM データのエクスポートをリクエストします。
 
@@ -994,7 +994,7 @@ paths:
   /exports/monthly_usage_by_sim:
     post:
       tags: [Exports]
-      summary: 月次利用実績 CSV エクスポート (SIM 別)
+      summary: CreateMonthlyUsageBySimExport — 月次利用実績 CSV エクスポート (SIM 別)
       description: |
         指定月の SIM 別月次利用実績を CSV でエクスポートします。misora-central の
         US-027（月次利用実績 CSV 出力）が消費する EP です。
@@ -1079,7 +1079,7 @@ paths:
   /recharges/sims:
     get:
       tags: [Recharges]
-      summary: リチャージ対象 SIM 一覧
+      summary: ListRechargeableSims — リチャージ対象 SIM 一覧
       description: リチャージ対象となる SIM の一覧を取得します。各 SIM のリチャージ可否、現在のプラン情報、予約件数が含まれます。
       operationId: ListRechargeableSims
       parameters:
@@ -1118,7 +1118,7 @@ paths:
   /recharges/sims/{sim_id}/plans:
     get:
       tags: [Recharges]
-      summary: SIM 別リチャージプラン
+      summary: ListSimRechargePlans — SIM 別リチャージプラン
       description: 特定 SIM の現在のプランに基づいて、利用可能なリチャージプランを取得します。
       operationId: ListSimRechargePlans
       parameters:
@@ -1152,9 +1152,27 @@ paths:
   /recharges/sims/{sim_id}/balance:
     get:
       tags: [Recharges]
-      summary: SIM 残量取得
+      summary: GetSimBalance — SIM 残量取得
       description: |
-        SIM の残容量情報を取得します（プランタイプに応じた 3 値を返す）。
+        特定 SIM の使える総量・残り容量・使用量を取得します。
+        マイページ等で「◯GB 中 ◯GB 残り」を描画する用途を想定しています。
+
+        **繰越（Banked Data）の扱い**: 使える総量 = 現プラン容量 + 繰越（未消化分 = Banked Data）。
+        消費順序は 現プラン → 繰越で、現プランの枯渇または期間満了時に繰越分は自動的に払い出されます
+        （お客様の操作は不要で、通信は途切れません）。したがって残量は現プランと繰越をまたいで連続して減ります。
+        繰越は無期限ではなく、払い出し用の内部プランの期間終了時に消滅します。
+
+        容量 3 値（`total_granted_bytes` / `total_remaining_bytes` / `used_bytes`）は capacity プランのみ値を持ち、
+        daily プランおよび総枠未確定時（初回リチャージ前・プランマスタ未登録等）は `null` を返します。
+
+        **daily プラン（1GB/day 等）**: 通算残量の概念を持たないため容量 3 値は `null` のまま、
+        当日枠を `daily_limit_bytes` / `daily_used_bytes` / `daily_remaining_bytes` で返します。
+        当日利用量は **日本時間の 0:00 以降**の実績を集計したもので、日付が変わると 0 に戻ります。
+        日次上限のないプラン（無制限）や、リセット周期が 1 日でないプランでは上限・残量が `null` になり、
+        当日利用量のみを返します。
+
+        レスポンスは全プランタイプで同一のスキーマです。capacity プランでは `daily_*` が、
+        daily プランでは容量 3 値が、それぞれ `null` として含まれます。
 
         累積 usage の取得に失敗した場合は `503` を返し、古い残量値は返しません（stale データを防ぐ）。
       operationId: GetSimBalance
@@ -1163,7 +1181,7 @@ paths:
         - name: sim_id
           in: path
           required: true
-          description: SIM 識別子（ICCID）
+          description: SIM ID（ICCID、19-20 桁の数字）
           schema:
             type: string
       responses:
@@ -1173,19 +1191,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RechargeSimBalance"
+              examples:
+                capacity:
+                  summary: capacity プラン（容量型）
+                  value:
+                    iccid: "8981080321000912770"
+                    plan_type: capacity
+                    total_granted_bytes: 6442450944
+                    total_remaining_bytes: 5368709120
+                    used_bytes: 1073741824
+                    banked_data_bytes: 1073741824
+                    filler_state: NORMAL
+                    checked_at: "2026-08-26T05:30:00Z"
+                    latest_record_time: "2026-08-25T15:00:00Z"
+                    daily_limit_bytes: null
+                    daily_used_bytes: null
+                    daily_remaining_bytes: null
+                    error_code: null
+                    message: null
+                daily:
+                  summary: daily プラン（日次型・1GB/day）
+                  value:
+                    iccid: "8981080321000912788"
+                    plan_type: daily
+                    total_granted_bytes: null
+                    total_remaining_bytes: null
+                    used_bytes: null
+                    banked_data_bytes: null
+                    filler_state: NORMAL
+                    checked_at: "2026-09-03T05:30:00Z"
+                    latest_record_time: "2026-09-03T05:18:00Z"
+                    daily_limit_bytes: 1073741824
+                    daily_used_bytes: 268435456
+                    daily_remaining_bytes: 805306368
+                    error_code: null
+                    message: null
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          description: サーバー内部エラー（想定外の例外）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "503":
           description: 累積 usage の取得に失敗（古い値は返さない）
 
   /recharges/plans:
     get:
       tags: [Recharges]
-      summary: 全リチャージプラン一覧
+      summary: ListRechargePlans — 全リチャージプラン一覧
       description: 顧客が利用可能な全リチャージプランのカタログを取得します。
       operationId: ListRechargePlans
       parameters:
@@ -1218,7 +1279,7 @@ paths:
   /recharges/plans/{plan_code}:
     get:
       tags: [Recharges]
-      summary: プラン詳細
+      summary: GetRechargePlan — プラン詳細
       description: 特定のリチャージプランの詳細情報を取得します。
       operationId: GetRechargePlan
       parameters:
@@ -1250,7 +1311,7 @@ paths:
   /recharges/reservations:
     get:
       tags: [Recharges]
-      summary: リチャージ予約一覧
+      summary: ListRechargeReservations — リチャージ予約一覧
       description: 顧客のリチャージ予約一覧を取得します。ICCID / SIM ID やステータスでのフィルタリングが可能です。
       operationId: ListRechargeReservations
       parameters:
@@ -1292,7 +1353,7 @@ paths:
           $ref: "#/components/responses/BadGateway"
     post:
       tags: [Recharges]
-      summary: リチャージ予約作成
+      summary: CreateRechargeReservation — リチャージ予約作成
       description: |
         SIM に対するリチャージ予約を作成します。1つの SIM に対して最大3件の予約が可能です。
 
@@ -1336,7 +1397,7 @@ paths:
   /recharges/immediate:
     post:
       tags: [Recharges]
-      summary: 即時リチャージ（プラン即時書換・残量リセット）
+      summary: CreateImmediateRecharge — 即時リチャージ（プラン即時書換・残量リセット）
       description: |
         ICCID とプランコードを指定して、**即時にプラン書換・残量リセット・PCRF 1 回 sync** を実行します。
         容量型プランのみ対象（日次型・CPFR・Internal はエラー）。予約の作成と実行をその場で行い、
@@ -2161,36 +2222,86 @@ components:
     RechargeSimBalance:
       type: object
       description: |
-        SIM の残量情報。プランタイプ (`capacity` / `daily`) に応じた 3 値
-        （付与済み・使用済み・残量）を返す。`filler_state` は残量が閾値を下回った
-        ときの前倒し実行状態を示す。
+        SIM の使える総量（現プラン容量 + 繰越）・残量・使用量。容量 3 値は capacity プランのみ値を持ち、
+        daily プランおよび総枠未確定時（初回リチャージ前・プランマスタ未登録等）は `null` を返します。
+        daily プランは代わりに当日枠（`daily_*`）を返します。
+        全プランタイプで同一スキーマのため、該当しない項目は `null` として含まれます。
       properties:
-        sim_id:
+        iccid:
           type: string
-          description: SIM 識別子（ICCID）
+          description: SIM 識別子（ICCID）。リクエストパスの `sim_id` と同じ値
         plan_type:
           type: string
-          enum: [capacity, daily]
-          description: 現在適用中のプラン種別
+          nullable: true
+          enum: [capacity, daily, null]
+          description: 現在適用中のプラン種別。現プランを特定できない場合（適用中プランが無い・不正等）は `null`
         total_granted_bytes:
           type: integer
-          description: 付与済み容量（バイト）
+          nullable: true
+          description: >-
+            付与容量（bytes）＝「◯GB 中 ◯GB 残り」の前者。
+            現プラン容量 + 繰越（Banked Data）の合計。capacity プランのみ、それ以外は `null`
         total_remaining_bytes:
           type: integer
-          description: 残量（バイト）
+          nullable: true
+          description: >-
+            利用可能残量（bytes）＝「◯GB 中 ◯GB 残り」の後者。繰越分を含む。
+            サーバ側で `0 ≤ remaining ≤ total_granted_bytes` および `used = granted − remaining`
+            の整合を保証するため、利用者側での追加補正は不要。capacity プランのみ
         used_bytes:
           type: integer
-          description: 使用済み容量（バイト）
+          nullable: true
+          description: 使用量（bytes、= `total_granted_bytes − total_remaining_bytes`）。capacity プランのみ
         banked_data_bytes:
           type: integer
           nullable: true
-          description: 繰越データ（バイト、対応プランのみ）
+          description: >-
+            繰越（未消化データ）残高（bytes）。`total_granted_bytes` / `total_remaining_bytes`
+            に既に含まれる内訳であり、加算しないこと。繰越の払い出し中（`filler_state != NORMAL`）は
+            0 になるが、総枠・残量は繰越分を含んだままなので表示は不連続にならない。capacity プランのみ
         filler_state:
           type: string
           enum: [NORMAL, FILLER_LARGE, FILLER_SMALL]
-          description: |
-            残量閾値による前倒し実行状態。`NORMAL` は通常、
-            `FILLER_LARGE` / `FILLER_SMALL` は前倒し実行が発火する状態。
+          description: Filler 状態。UI が「枯渇」と低速モードを区別する補助情報
+        checked_at:
+          type: string
+          format: date-time
+          description: 残量を確認した時刻（UTC、RFC 3339 / `...Z` 形式）
+        latest_record_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            残量算出に使った使用量データの最新記録時刻（UTC、RFC 3339 / `...Z` 形式）。
+            通信実績が無い SIM や、使用量を参照しない状態（総枠未確定など）では `null`。
+            daily プランでは当日分の集計に使った最新実績の時刻を返す
+        daily_limit_bytes:
+          type: integer
+          nullable: true
+          description: >-
+            1 日あたりの上限（bytes）。daily プランのみ。
+            日次上限のないプラン（無制限）、リセット周期が 1 日でないプラン、
+            およびプラン情報から上限を判定できない場合は `null`
+        daily_used_bytes:
+          type: integer
+          nullable: true
+          description: >-
+            当日利用量（bytes）。**日本時間 0:00 以降**の実績の合計で、日付が変わると 0 に戻る。
+            daily プランのみ。通信実績が無い SIM は `0`
+        daily_remaining_bytes:
+          type: integer
+          nullable: true
+          description: >-
+            当日残量（bytes）＝ `daily_limit_bytes − daily_used_bytes`（0 未満にはならない）。
+            daily プランのみ。`daily_limit_bytes` が `null` の場合は `null`
+        error_code:
+          type: string
+          nullable: true
+          description: 成功時（200）は常に `null`（エラー応答と共通の項目）
+        message:
+          type: string
+          nullable: true
+          description: 成功時（200）は常に `null`（エラー応答と共通の項目）
 
     Plan:
       type: object
