@@ -915,14 +915,14 @@ paths:
 
         解約済み SIM は除外されます。
 
-        CSV は以下の **41 列** を、この順で出力します（列名は `Sim` スキーマのフィールド名）。
+        CSV は以下の **42 列** を、この順で出力します（列名は `Sim` スキーマのフィールド名）。
 
         `sim_id`, `customer_code`, `application_start_date`, `cancellation_mobile_core_date`,
         `carrier_opening_date`, `carrier_withdrawal_date`, `communication_generation`,
         `dns_primary`, `dns_secondary`, `extension_end_date`, `first_communicating_date`,
         `imsi`, `ip_address`, `ip_address_type`, `line_category`, `line_status_from_mc`,
         `line_stoped_date`, `lines_status`, `linestarted_date`, `opening_date`,
-        `puk1`, `password`, `msisdn`, `realm`,
+        `puk1`, `user_id`, `password`, `msisdn`, `realm`,
         `service_category`, `use_start_expiration_date`, `shipping_date`, `apn`,
         `active_plan_name`, `product_name`, `sim_category`, `product_name_id`,
         `status`, `session_status`, `session_created_at`, `session_terminated_at`,
@@ -939,8 +939,12 @@ paths:
           **それより後ろの列は位置が 2 つ後ろにずれます**（ipv6 の削除と合わせると正味 1 つ前）
         - `lines_state_ss_for_mypage` 以降の 5 列を末尾に追加
 
+        続く更新で `user_id`（APN 認証のユーザ ID）を `password` の直前に追加しました（41 列 → 42 列）。
+        `password` と組で使う値のため、例外的に途中に置いています。
+        **`password` 以降の列は位置が 1 つ後ろにずれます。**
+
         列名で読んでいる場合は、削除した 3 列を参照していなければ影響ありません。
-        列を位置で読んでいる場合は追随してください。今後列を足す場合は末尾に足します。
+        列を位置で読んでいる場合は追随してください。今後列を足す場合は原則として末尾に足します。
       operationId: CreateSimsExport
       parameters:
         - $ref: "#/components/parameters/CustomerCode"
@@ -1587,10 +1591,10 @@ components:
     Sim:
       type: object
       description: |
-        `GET /v1/sims` の応答。`mc_sims` ビューの 44 列に対応する
-        （ビューは 46 列で、うち `activation_code` / `puk2` の 2 列は API・CSV とも出力しない。
-        `puk1` / `password` は 2026-09 の更新で出力するようになりました）。
-        明細 `GET /v1/sims/{sim_id}` は、これに `note` と `user_id` を足した `SimDetail` を返す。
+        `GET /v1/sims` の応答。`mc_sims` ビューの 45 列に対応する
+        （ビューは 47 列で、うち `activation_code` / `puk2` の 2 列は API・CSV とも出力しない。
+        `puk1` / `user_id` / `password` は 2026-09 の更新で出力するようになりました）。
+        明細 `GET /v1/sims/{sim_id}` は、これに `note` を足した `SimDetail` を返す。
 
         `filter_nulls=true`（既定）のとき、値が null のフィールドは **キーごと応答から消える**
         （`null` として返るのではない）。`nullable: true` が効くのは `filter_nulls=false` のとき。
@@ -1699,11 +1703,19 @@ components:
           description: |
             PUK1（PIN ロック解除コード）。SIM の PIN を 3 回連続で誤入力してロックした際の
             解除に使います。**取り扱いにご注意ください。**
+        user_id:
+          type: string
+          nullable: true
+          maxLength: 40
+          description: |
+            APN 認証のユーザ ID。APN 設定時に `apn` / `password` と組で使います。
+            **取り扱いにご注意ください。**
+            値が無い SIM では空文字が返ることがあります（`null` に寄せません）。
         password:
           type: string
           nullable: true
           description: |
-            APN 認証のパスワード。APN 設定時に `apn` と対で使います。
+            APN 認証のパスワード。APN 設定時に `apn` / `user_id` と組で使います。
             **取り扱いにご注意ください。**
         msisdn:
           type: string
@@ -1852,6 +1864,7 @@ components:
                 備考が無い SIM では `filter_nulls=true`（既定）なら **キーごと落ち**、
                 `filter_nulls=false` なら `null` が返る。どちらも「備考なし」を意味し、
                 クライアントは両者を区別しない。**空文字は返らない**（空は `null` に寄せる）。
+
     SimCount:
       type: object
       description: |
