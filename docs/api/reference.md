@@ -635,10 +635,12 @@ daily プラン（日次型・1GB/day）:
 
 | ステータス | 条件 |
 |---|---|
-| 400 | `sim_id` 未指定、ICCID 形式不正、解約済み SIM |
+| 400 | `sim_id` 未指定、ICCID 形式不正、解約済み SIM（`message: SIM is terminated`） |
 | 403 | 指定 SIM を当該顧客が所有していない |
 | 404 | SIM が見つからない |
 | 503 | 累積 usage 取得に失敗（古い値・キャッシュは返さない） |
+
+解約済み SIM の残量は返しません。`GET /v1/sims` で `include_terminated=true` を指定して取得した SIM や、解約直後で一覧にまだ残っている SIM に対して呼ぶと 400 になります（解約済み SIM は `GET /v1/recharges/sims` の一覧には含まれません）。
 
 ---
 
