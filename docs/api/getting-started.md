@@ -47,18 +47,20 @@ print(response.json())
 ```json
 [
   {
-    "sim_id": "sim-001",
-    "customer_code": "110139801",
-    "iccid": "8981100000000000001",
-    "msisdn": "09012345678",
+    "sim_id": "8981080000000012345",
+    "customer_code": "110000001",
+    "msisdn": "812000000001",
+    "tel": "02000000001",
     "status": "active",
     "session_status": "online",
-    "apn": "misora.io",
-    "active_plan_name": "plan-s",
-    "ip_address": "10.0.0.1"
+    "apn": "example.invalid",
+    "active_plan_name": "5GB/月 ライト/フル 制限時256kbps",
+    "ip_address": "192.0.2.1"
   }
 ]
 ```
+
+（主なフィールドのみ抜粋。すべてのフィールドは [API Reference](reference.md) を参照してください）
 
 ## ステップ 3: SIM のサマリーを確認する
 
@@ -71,10 +73,15 @@ curl -H "x-api-key: YOUR_API_KEY" \
 
 ```json
 {
-  "total": 150,
-  "active": 120,
-  "suspended": 25,
-  "terminated": 5
+  "customer_code": "110000001",
+  "total": 439,
+  "subscribed": 426,
+  "ready": 330,
+  "active": 2,
+  "online": 16,
+  "terminated": 13,
+  "unknown": 94,
+  "updated_at": "2026-08-12T15:04:31Z"
 }
 ```
 
@@ -140,7 +147,7 @@ API にはレート制限が設定されています。
 
 | 項目 | 値 |
 |---|---|
-| スロットル | 1 リクエスト/秒（バースト: 1） |
+| スロットル | 1 リクエスト/秒（バースト: 5） |
 | 日次クォータ | 1,500 リクエスト/日 |
 
 制限を超えた場合は `429 Too Many Requests` が返ります。
