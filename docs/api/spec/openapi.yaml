@@ -713,7 +713,7 @@ paths:
       summary: ExportSimDailyUsage — SIM 別日次通信量 CSV エクスポート
       description: |
         `GET /v1/stats/sims/{sim_id}/daily_usage` と同じデータを CSV でエクスポートし、
-        S3 に配置してプリサインド URL を返します（同期・24 時間有効）。
+        署名付きダウンロード URL を返します（同期・24 時間有効）。
 
         - **期間指定 (`start_date` / `end_date`) は必須**です。`days` 指定はできません。
           期間の規則は同期 EP と同一で、**`start_date` は JST 前日以前かつ今日から 31 日以内**、
@@ -2101,10 +2101,10 @@ components:
         download_url:
           type: string
           format: uri
-          description: プリサインド URL (S3 GetObject)。
+          description: 署名付きダウンロード URL（24 時間有効）。ホストは S3 または CloudFront。
         expires_in_seconds:
           type: integer
-          description: プリサインド URL の有効秒数。
+          description: 署名付きダウンロード URL の有効秒数。
         data_through:
           type: string
           format: date
