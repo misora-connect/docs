@@ -52,6 +52,7 @@ SIM の一覧を取得します。
     "ip_address_type": "動的IP",
     "opening_date": "2026-01-06",
     "puk1": "12345678",
+    "user_id": "example-user",
     "password": "example-password",
     "lines_state_ss_for_mypage": "開通",
     "product_code": "EXAMPLE-001",
@@ -83,14 +84,15 @@ SIM の一覧を取得します。
 | `ip_address_type` | string | IP アドレス種別 |
 | `opening_date` | string | 開通日 |
 | `puk1` | string | PUK1（PIN ロック解除コード）。**取り扱いにご注意ください** |
+| `user_id` | string | APN 認証のユーザ ID。`apn` / `password` と組で使います。**取り扱いにご注意ください** |
 | `password` | string | APN 認証のパスワード。`apn` と対で使います。**取り扱いにご注意ください** |
 | `lines_state_ss_for_mypage` | string | 回線状態（マイページの表示値）。画面表示にはこちらを使ってください |
 | `product_code` | string | 商品コード |
 | `sim_stock_status` | string | SIM 状態（`白` / `半黒` / `黒`）。回線状態の `status` とは別物です |
 
-すべてのフィールド（44 項目）と各フィールドの詳細は [OpenAPI Spec](spec/) の `Sim` スキーマを参照してください。
+すべてのフィールド（45 項目）と各フィールドの詳細は [OpenAPI Spec](spec/) の `Sim` スキーマを参照してください。
 
-`puk1` / `password` は 2026 年 9 月の更新で返すようになりました。
+`puk1` / `password` は 2026 年 9 月、`user_id` は 2026 年 10 月の更新で返すようになりました。
 
 **エラーレスポンス**
 
@@ -482,14 +484,14 @@ SIM データのエクスポートをリクエストします。
 
 **CSV の列構成**
 
-CSV は次の **41 列** を、この順で出力します（列名は SIM オブジェクトのフィールド名）。
+CSV は次の **42 列** を、この順で出力します（列名は SIM オブジェクトのフィールド名）。
 
 `sim_id`, `customer_code`, `application_start_date`, `cancellation_mobile_core_date`,
 `carrier_opening_date`, `carrier_withdrawal_date`, `communication_generation`,
 `dns_primary`, `dns_secondary`, `extension_end_date`, `first_communicating_date`,
 `imsi`, `ip_address`, `ip_address_type`, `line_category`, `line_status_from_mc`,
 `line_stoped_date`, `lines_status`, `linestarted_date`, `opening_date`,
-`puk1`, `password`, `msisdn`, `realm`,
+`puk1`, `user_id`, `password`, `msisdn`, `realm`,
 `service_category`, `use_start_expiration_date`, `shipping_date`, `apn`,
 `active_plan_name`, `product_name`, `sim_category`, `product_name_id`,
 `status`, `session_status`, `session_created_at`, `session_terminated_at`,
@@ -504,9 +506,11 @@ CSV は次の **41 列** を、この順で出力します（列名は SIM オ�
 > - `puk1` / `password` を `opening_date` の直後に追加
 > - `lines_state_ss_for_mypage` 以降の 5 列を末尾に追加
 >
-> 列を位置で読んでいる場合は追随してください。列名で読んでいる場合は、削除した 3 列を参照していなければ影響ありません。今後列を追加する場合は末尾に追加します。
+> 続く 2026 年 10 月の更新で、`user_id`（APN 認証のユーザ ID）を `password` の直前に追加しました（41 列 → 42 列）。`password` と組で使う値のため、例外的に途中に置いています。**`password` 以降の列は位置が 1 つ後ろにずれます。**
 >
-> CSV には `puk1`（PIN ロック解除コード）と `password`（APN 認証のパスワード）が含まれます。ダウンロードしたファイルの取り扱いにご注意ください。
+> 列を位置で読んでいる場合は追随してください。列名で読んでいる場合は、削除した 3 列を参照していなければ影響ありません。今後列を追加する場合は原則として末尾に追加します。
+>
+> CSV には `puk1`（PIN ロック解除コード）、`user_id` と `password`（APN 認証のユーザ ID とパスワード）が含まれます。ダウンロードしたファイルの取り扱いにご注意ください。
 
 **クエリパラメータ**
 

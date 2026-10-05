@@ -250,8 +250,8 @@ curl -X POST -H "x-api-key: YOUR_API_KEY" \
 | JSON | `json` | JSON 配列 |
 | JSON Lines | `jsonl` | 1 行 1 レコードの JSON |
 
-CSV の列構成（41 列）は [API Reference](reference.md) の CreateSimsExport を参照してください。
-2026 年 9 月の更新で列構成が変わり、`puk1`（PIN ロック解除コード）と `password`（APN 認証のパスワード）が含まれるようになりました。ダウンロードしたファイルの取り扱いにご注意ください。
+CSV の列構成（42 列）は [API Reference](reference.md) の CreateSimsExport を参照してください。
+CSV には `puk1`（PIN ロック解除コード）、`user_id` と `password`（APN 認証のユーザ ID とパスワード）が含まれます（2026 年 9〜10 月の更新で追加）。ダウンロードしたファイルの取り扱いにご注意ください。
 
 ## リチャージ（容量追加）
 
