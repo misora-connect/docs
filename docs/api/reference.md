@@ -810,19 +810,37 @@ daily プラン（日次型・1GB/day）:
 
 ```json
 {
-  "reservation_id": "rsv-001",
+  "reservation_id": "RR-00012",
   "status": "Reserved",
   "reserved_at": "2026-06-16T10:00:00Z"
 }
 ```
 
+`executed_at` は予約作成の応答には含まれません。実行日時は `GET /v1/recharges/reservations` で取得してください。
+
+#### 予約できる件数
+
+1 つの SIM に対して予約できるのは **最大 3 件** です。上限にカウントされるのは `status` が
+`Reserved`（未実行）の予約のみで、`Executed`（実行済み）や取り消し済みの予約は含みません。
+
+そのため「通算 4 件目」ではなく「未実行の予約が同時に 4 件になる」タイミングで
+`LIMIT_EXCEEDED` になります。3 件予約済みでも、そのうち 1 件が実行されれば次の予約を作成できます。
+
 **エラーレスポンス**
 
-| ステータス | 条件 |
-|---|---|
-| `400` | 必須フィールドの不足、不正な SIM ID やプランコード |
-| `403` | アクセス権限なし |
-| `502` | 下流サービスのエラー |
+| ステータス | `errorCode` | 条件 |
+|---|---|---|
+| `400` | `BAD_REQUEST` | 不正な SIM ID やプランコード、解約済み SIM、リチャージ対象外プラン、受付期限の超過 |
+| `400` | `LIMIT_EXCEEDED` | 未実行の予約が上限（3 件）に到達している |
+| `400` | `PLAN_MISMATCH` | 容量上限型と日次上限型の混在、または日次上限型で 1 日あたり容量・リセット周期が現行プランと不一致 |
+| `400` | `REALM_MISMATCH` | プランのレルムが SIM の現行レルムと不一致 |
+| `403` | `FORBIDDEN` | アクセス権限なし |
+| `404` | `NOT_FOUND` | 指定した SIM が登録されていない |
+| `400` | `VALIDATION_ERROR` | `plan_code` の不足・型不正などリクエストボディの不正 |
+| `502` | - | 下流サービスのエラー |
+
+`sim_id` が未指定の場合と、`sim_id` と `iccid` を異なる値で両方指定した場合は、`errorCode` を持たない
+400（`detail` が文字列の形式 A。後述の「共通エラーレスポンス」を参照）になります。
 
 リチャージサービスのエラーレスポンスは次の形式です。
 
@@ -830,10 +848,33 @@ daily プラン（日次型・1GB/day）:
 {
   "detail": {
     "errorCode": "FORBIDDEN",
-    "message": "Access denied for the specified resource"
+    "message": "Customer does not have permission for this ICCID"
   }
 }
 ```
+
+`errorCode` が `BAD_REQUEST` になる条件は複数あるため、条件の切り分けには `message` を参照してください。
+主なものは次のとおりです。
+
+| `message` | 条件 |
+|---|---|
+| `Invalid ICCID format` | SIM ID が 19-20 桁の数字でない |
+| `Invalid planCode` | 存在しない、または有効期限切れのプランコード |
+| `SIM is terminated` | 解約済みの SIM を指定した |
+| `CPFR plans are not eligible for recharge` | リチャージ対象外のプラン（定額・容量無制限）を指定した |
+| `Reservation is not accepted after 19:00 on the last day` | 利用終了日当日の 19:00（JST）以降に予約しようとした（後述の「予約の受付期限」を参照） |
+
+#### 予約の受付期限
+
+**利用終了日の当日に限り、19:00（JST）以降の予約は受け付けません。** 当日の 19:00 以降に
+予約を作成しようとすると `400` / `BAD_REQUEST` /
+`Reservation is not accepted after 19:00 on the last day` を返します。
+
+利用終了日より前であれば、時刻による制限はありません。当日分の予約が必要な場合は、
+19:00（JST）までに作成してください。
+
+この締切は、利用終了日当日に行われるリチャージの実行処理（後述の 20:00 / 21:00）に
+予約を確実に間に合わせるためのものです。
 
 #### リチャージの実行タイミング
 
@@ -861,7 +902,7 @@ daily プラン（日次型・1GB/day）:
 | パラメータ | 型 | 必須 | デフォルト | 説明 |
 |---|---|---|---|---|
 | `sim_id` | string | No | - | 特定 SIM でフィルタ |
-| `status` | string | No | - | ステータスでフィルタ。`Reserved` / `Executed` / `Failed`。値が一致しない場合は `400` |
+| `status` | string | No | - | ステータスでフィルタ。`Reserved` / `Executed` / `Failed`。大文字始まりのみ有効で、値が一致しない場合は `400`。取り消し済み（`Cancelled`）の予約は一覧に含まれないため、フィルタ値としても指定できません |
 | `page_size` | integer | No | 200 | 1ページあたりの件数 |
 | `cursor` | string | No | - | ページネーションカーソル |
 
@@ -893,7 +934,7 @@ daily プラン（日次型・1GB/day）:
 | `reservation_id` | string | 予約 ID |
 | `sim_id` | string | SIM の一意識別子（ICCID） |
 | `plan_code` | string | プランコード |
-| `status` | string | ステータス。`Reserved`（予約済み）/ `Executed`（実行済み）/ `Failed`（失敗） |
+| `status` | string | ステータス。`Reserved`（予約済み）/ `Executed`（実行済み）/ `Failed`（失敗）。取り消し済みの予約は一覧に含まれません |
 | `reserved_at` | string | 予約日時（ISO 8601） |
 | `executed_at` | string\|null | 実行日時（ISO 8601） |
 
@@ -933,7 +974,6 @@ daily プラン（日次型・1GB/day）:
   "reservation_id": "a1XRB000005P7Q12AK",
   "sync_status": "実行中",
   "superseded_reservation_ids": [],
-  "error_code": null,
   "message": "Immediate recharge executed. PCRF sync triggered."
 }
 ```
@@ -948,12 +988,23 @@ daily プラン（日次型・1GB/day）:
 | `reservation_id` | string \| null | 生成された予約 ID |
 | `sync_status` | string \| null | ネットワーク側への反映状況。成功直後は `実行中` で、反映完了後に `実行済` へ変わります |
 | `superseded_reservation_ids` | array | `force` により取り消した既存予約の ID |
-| `error_code` | string \| null | エラーコード（成功時は `null`） |
 | `message` | string | 処理結果メッセージ |
 
 **主要エラー**
 
-| ステータス | `error_code` | 条件 |
+エラー時のボディは成功時と形が異なり、`detail` の中に `errorCode` と `message` が入ります
+（後述の「共通エラーレスポンス」形式 B）。成功時のレスポンスに `error_code` フィールドは含まれません。
+
+```json
+{
+  "detail": {
+    "errorCode": "INVALID_PLAN",
+    "message": "Plan is not eligible for immediate recharge"
+  }
+}
+```
+
+| ステータス | `detail.errorCode` | 条件 |
 |---|---|---|
 | 400 | `INVALID_REQUEST` | 必須項目が不足している |
 | 400 | `INVALID_ICCID` | `sim_id` が未指定、または ICCID の形式が不正 |
@@ -972,18 +1023,47 @@ daily プラン（日次型・1GB/day）:
 
 ## 共通エラーレスポンス
 
-すべてのエンドポイントで、次の共通形式のエラーレスポンスを返します。
+エラー応答のボディは、エンドポイントとエラーの発生箇所によって次の 2 形式のいずれかになります。
+クライアント側では両方を扱えるようにしてください。
+
+**形式 A — `detail` が文字列**
+
+SIMs / Stats / Exports の各エンドポイントと、Recharges のパラメータ検証エラーで返します。
 
 ```json
 {
-  "detail": "Error message"
+  "detail": "SIM not found"
 }
 ```
+
+**形式 B — `detail` がオブジェクト**
+
+Recharges のうちリチャージサービスへ委譲するエンドポイント（残量取得、プラン一覧、
+予約の作成・一覧、即時リチャージ）で返します。`errorCode` / `message` はキャメルケースです。
+
+```json
+{
+  "detail": {
+    "errorCode": "BAD_REQUEST",
+    "message": "SIM is terminated"
+  }
+}
+```
+
+リクエストボディの形式が不正な場合（必須キーの欠落・型不正）のみ、`message` の代わりに詳細の配列
+`errors` が入ります（`errorCode` は `VALIDATION_ERROR`）。値が空文字の場合など、同じ `VALIDATION_ERROR`
+でも `message` で返る場合があります。
+
+`errorCode` は各エンドポイントの表に記載したもの以外に、下流サービスの障害時には `SF_AUTH_ERROR` /
+`SF_API_ERROR` / `INTERNAL_ERROR` / `UNKNOWN_ERROR` なども返ります。未知の値も扱えるようにしてください。
+
+なお、API キーが不正または未指定の場合は API Gateway が応答するため、上記いずれとも異なる
+`{"message": "Forbidden"}` が返ります。
 
 | ステータスコード | 説明 |
 |---|---|
 | `400 Bad Request` | パラメータ不正（未指定、フォーマットエラー、上限超過など） |
-| `403 Forbidden` | 認証失敗 |
+| `403 Forbidden` | 認証失敗（API キー不正）、または指定したリソースへのアクセス権限がない（他社所有の SIM を指定した場合など） |
 | `404 Not Found` | 指定されたリソースが存在しない |
 | `429 Too Many Requests` | レート制限を超過。時間を置いてから再試行してください |
 | `500 Internal Server Error` | サーバー内部エラー |
