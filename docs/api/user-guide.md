@@ -39,12 +39,12 @@ curl -H "x-api-key: YOUR_API_KEY" \
 `order_by` と `order_direction` でソート順を指定します。
 
 ```bash
-# 更新日時の新しい順
+# 回線状態の降順
 curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.misora-connect.com/v1/sims?order_by=updated_at&order_direction=desc"
+  "https://api.misora-connect.com/v1/sims?order_by=status&order_direction=desc"
 ```
 
-ソート可能なフィールドは `sim_id`、`status`、`created_at`、`updated_at` です。
+ソート可能なフィールドは `sim_id`、`customer_code`、`status` です。それ以外を指定すると `400` になります。
 
 #### 解約済み SIM の表示
 
@@ -249,6 +249,9 @@ curl -X POST -H "x-api-key: YOUR_API_KEY" \
 | CSV | `csv`（デフォルト） | カンマ区切りテキスト |
 | JSON | `json` | JSON 配列 |
 | JSON Lines | `jsonl` | 1 行 1 レコードの JSON |
+
+CSV の列構成（41 列）は [API Reference](reference.md) の CreateSimsExport を参照してください。
+2026 年 9 月の更新で列構成が変わり、`puk1`（PIN ロック解除コード）と `password`（APN 認証のパスワード）が含まれるようになりました。ダウンロードしたファイルの取り扱いにご注意ください。
 
 ## リチャージ（容量追加）
 
