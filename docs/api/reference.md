@@ -572,6 +572,8 @@ CSV は次の **42 列** を、この順で出力します（列名は SIM オ�
 | `page_size` | integer | No | 200 | 1ページあたりの件数 |
 | `cursor` | string | No | - | ページネーションカーソル |
 
+`sim_id`（または `iccid`）で絞り込めます。両方を異なる値で指定した場合は `400` / `BAD_REQUEST` になります。
+
 **レスポンス** `200 OK`
 
 ```json
@@ -790,6 +792,19 @@ daily プラン（日次型・1GB/day）:
 | `daily_limit` | number\|null | 日次上限（GB）。`daily` タイプの場合に設定 |
 | `duration_days` | integer | プラン有効日数 |
 
+**エラーレスポンス**
+
+指定した `plan_code` が当該顧客の利用可能プランに無い場合は、`404` / `NOT_FOUND`（`message` は `Plan not found`）です。
+
+```json
+{
+  "detail": {
+    "errorCode": "NOT_FOUND",
+    "message": "Plan not found"
+  }
+}
+```
+
 ---
 
 ### CreateRechargeReservation
@@ -845,8 +860,9 @@ daily プラン（日次型・1GB/day）:
 | `400` | `VALIDATION_ERROR` | `plan_code` の不足・型不正などリクエストボディの不正 |
 | `502` | - | 下流サービスのエラー |
 
-`sim_id` が未指定の場合と、`sim_id` と `iccid` を異なる値で両方指定した場合は、`errorCode` を持たない
-400（`detail` が文字列の形式 A。後述の「共通エラーレスポンス」を参照）になります。
+`sim_id`（または `iccid`）が未指定の場合と、`sim_id` と `iccid` を異なる値で両方指定した場合も、
+`400` / `BAD_REQUEST` になります（`message` は `iccid or sim_id is required` /
+`iccid and sim_id both provided but differ; ...`）。
 
 リチャージサービスのエラーレスポンスは次の形式です。
 
@@ -911,6 +927,8 @@ daily プラン（日次型・1GB/day）:
 | `status` | string | No | - | ステータスでフィルタ。`Reserved` / `Executed` / `Failed`。大文字始まりのみ有効で、値が一致しない場合は `400`。取り消し済み（`Cancelled`）の予約は一覧に含まれないため、フィルタ値としても指定できません |
 | `page_size` | integer | No | 200 | 1ページあたりの件数 |
 | `cursor` | string | No | - | ページネーションカーソル |
+
+`sim_id` と `iccid` を異なる値で両方指定した場合は `400` / `BAD_REQUEST` になります。
 
 **レスポンス** `200 OK`
 
@@ -1012,8 +1030,8 @@ daily プラン（日次型・1GB/day）:
 
 | ステータス | `detail.errorCode` | 条件 |
 |---|---|---|
-| 400 | `INVALID_REQUEST` | 必須項目が不足している |
-| 400 | `INVALID_ICCID` | `sim_id` が未指定、または ICCID の形式が不正 |
+| 400 | `INVALID_REQUEST` | 必須項目が不足している、または `sim_id` と `iccid` を異なる値で両方指定した |
+| 400 | `INVALID_ICCID` | `sim_id`（または `iccid`）が未指定、または ICCID の形式が不正 |
 | 400 | `INVALID_PLAN` | プランコードが不正、解約済み SIM、日次上限型 / CPFR / 社内専用プランを指定した |
 | 400 | `REALM_MISMATCH` | SIM とプランの接続先ネットワークが一致しない |
 | 403 | `FORBIDDEN_TENANT` | 指定 SIM を当該顧客が所有していない |
@@ -1034,7 +1052,9 @@ daily プラン（日次型・1GB/day）:
 
 **形式 A — `detail` が文字列**
 
-SIMs / Stats / Exports の各エンドポイントと、Recharges のパラメータ検証エラーで返します。
+SIMs / Stats / Exports の各エンドポイントと、全エンドポイント共通の `customer_code` の解決で返るエラー
+（400: `customer_code` と `customer_id` の不一致・未指定 / 401: 認証コンテキストなし /
+403: 認証スコープと不一致）で返します。
 
 ```json
 {
@@ -1044,8 +1064,8 @@ SIMs / Stats / Exports の各エンドポイントと、Recharges のパラメ�
 
 **形式 B — `detail` がオブジェクト**
 
-Recharges のうちリチャージサービスへ委譲するエンドポイント（残量取得、プラン一覧、
-予約の作成・一覧、即時リチャージ）で返します。`errorCode` / `message` はキャメルケースです。
+Recharges のエラー（上記の `customer_code` に関するエラーを除く）で返します。`sim_id` / `iccid` の
+未指定・不一致や、プラン詳細の 404 も、この形式です。`errorCode` / `message` はキャメルケースです。
 
 ```json
 {
