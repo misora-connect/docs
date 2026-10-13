@@ -172,8 +172,8 @@ paths:
       description: |
         特定の SIM の詳細情報を取得します。
 
-        `GET /v1/sims` の全フィールドに加えて、備考 `note` を返します（`SimDetail` スキーマ）。
-        `note` は明細でのみ返り、一覧・CSV エクスポートには含まれません。
+        `GET /v1/sims` の全フィールドに加えて、備考 `note` と一時停止フラグ `lines_temporary_stop` を
+        返します（`SimDetail` スキーマ）。この 2 つは明細でのみ返り、一覧・CSV エクスポートには含まれません。
 
         SIM 一覧と共通のフィールドについては `Sim` スキーマを参照してください。
       operationId: GetSim
@@ -232,6 +232,7 @@ paths:
                 session_status: "online"
                 session_created_at: "2026-08-18T22:54:11Z"
                 note: "不良SIMのため交換対応済み"
+                lines_temporary_stop: true
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -713,7 +714,7 @@ paths:
       summary: ExportSimDailyUsage — SIM 別日次通信量 CSV エクスポート
       description: |
         `GET /v1/stats/sims/{sim_id}/daily_usage` と同じデータを CSV でエクスポートし、
-        S3 に配置してプリサインド URL を返します（同期・24 時間有効）。
+        署名付きダウンロード URL を返します（同期・24 時間有効）。
 
         - **期間指定 (`start_date` / `end_date`) は必須**です。`days` 指定はできません。
           期間の規則は同期 EP と同一で、**`start_date` は JST 前日以前かつ今日から 31 日以内**、
@@ -1084,7 +1085,9 @@ paths:
     get:
       tags: [Recharges]
       summary: ListRechargeableSims — リチャージ対象 SIM 一覧
-      description: リチャージ対象となる SIM の一覧を取得します。各 SIM のリチャージ可否、現在のプラン情報、予約件数が含まれます。
+      description: |
+        リチャージ対象となる SIM の一覧を取得します。各 SIM のリチャージ可否、現在のプラン情報、予約件数が含まれます。
+        `sim_id` と `iccid` を異なる値で両方指定した場合は `400` / `BAD_REQUEST` になります。
       operationId: ListRechargeableSims
       parameters:
         - $ref: "#/components/parameters/CustomerCode"
@@ -1311,7 +1314,9 @@ paths:
     get:
       tags: [Recharges]
       summary: GetRechargePlan — プラン詳細
-      description: 特定のリチャージプランの詳細情報を取得します。
+      description: |
+        特定のリチャージプランの詳細情報を取得します。
+        指定した `plan_code` が当該顧客の利用可能プランに無い場合は `404` / `NOT_FOUND`（`Plan not found`）です。
       operationId: GetRechargePlan
       parameters:
         - name: plan_code
@@ -1343,7 +1348,9 @@ paths:
     get:
       tags: [Recharges]
       summary: ListRechargeReservations — リチャージ予約一覧
-      description: 顧客のリチャージ予約一覧を取得します。ICCID / SIM ID やステータスでのフィルタリングが可能です。
+      description: |
+        顧客のリチャージ予約一覧を取得します。ICCID / SIM ID やステータスでのフィルタリングが可能です。
+        `sim_id` と `iccid` を異なる値で両方指定した場合は `400` / `BAD_REQUEST` になります。
       operationId: ListRechargeReservations
       parameters:
         - $ref: "#/components/parameters/CustomerCode"
@@ -1416,8 +1423,9 @@ paths:
         | 404 | `NOT_FOUND` | 指定 SIM が登録されていない |
         | 400 | `VALIDATION_ERROR` | `plan_code` の不足・型不正などリクエストボディの不正 |
 
-        `sim_id`（または `iccid`）が未指定の場合と、`sim_id` と `iccid` を異なる値で両方指定した場合は、
-        `errorCode` を持たない 400（`detail` が文字列）になります。
+        `sim_id`（または `iccid`）が未指定の場合と、`sim_id` と `iccid` を異なる値で両方指定した場合も
+        `400` / `BAD_REQUEST` になります（`message` は `iccid or sim_id is required` /
+        `iccid and sim_id both provided but differ; ...`）。
 
         予約上限にカウントされるのは `status` が `Reserved` の予約のみです。`Executed` や取り消し済みの
         予約は含まないため、3 件予約済みでもそのうち 1 件が実行されれば次の予約を作成できます。
@@ -1464,6 +1472,9 @@ paths:
 
         `force=true` で既存 `Reserved` 予約を `Cancelled` 化して前倒し実行します。
         PCRF 同期中（`SyncStatus=実行中`）は force 不問で `409 ALREADY_SYNCING`。
+
+        `sim_id`（または `iccid`）が未指定の場合は `400` / `INVALID_ICCID`、`sim_id` と `iccid` を
+        異なる値で両方指定した場合は `400` / `INVALID_REQUEST` になります。
       operationId: CreateImmediateRecharge
       parameters:
         - $ref: "#/components/parameters/CustomerCode"
@@ -1621,7 +1632,7 @@ components:
         `GET /v1/sims` の応答。`mc_sims` ビューの 45 列に対応する
         （ビューは 47 列で、うち `activation_code` / `puk2` の 2 列は API・CSV とも出力しない。
         `puk1` / `user_id` / `password` は 2026-09 の更新で出力するようになりました）。
-        明細 `GET /v1/sims/{sim_id}` は、これに `note` を足した `SimDetail` を返す。
+        明細 `GET /v1/sims/{sim_id}` は、これに `note` と `lines_temporary_stop` を足した `SimDetail` を返す。
 
         `filter_nulls=true`（既定）のとき、値が null のフィールドは **キーごと応答から消える**
         （`null` として返るのではない）。`nullable: true` が効くのは `filter_nulls=false` のとき。
@@ -1871,7 +1882,8 @@ components:
 
     SimDetail:
       description: |
-        `GET /v1/sims/{sim_id}` の応答。`Sim` の全フィールドに加えて `note` を返す。
+        `GET /v1/sims/{sim_id}` の応答。`Sim` の全フィールドに加えて `note` と
+        `lines_temporary_stop` を返す。
 
         `note` は明細でのみ返る。`GET /v1/sims`（一覧）と CSV エクスポートには
         含まれない（#57）。自由記述の備考を顧客向け CSV に混ぜないため、
@@ -1891,6 +1903,16 @@ components:
                 備考が無い SIM では `filter_nulls=true`（既定）なら **キーごと落ち**、
                 `filter_nulls=false` なら `null` が返る。どちらも「備考なし」を意味し、
                 クライアントは両者を区別しない。**空文字は返らない**（空は `null` に寄せる）。
+            lines_temporary_stop:
+              type: boolean
+              nullable: true
+              example: true
+              description: |
+                回線の一時停止フラグ（Salesforce `Inventory__c.LinesTemporaryStop__c` の値をそのまま返す）。
+
+                明細でのみ返る。`GET /v1/sims`（一覧）と CSV エクスポートには含まれない。
+                `false` は `filter_nulls=true`（既定）でも落ちない。値が無い SIM では
+                `filter_nulls=true` ならキーごと落ち、`filter_nulls=false` なら `null` が返る。
 
     SimCount:
       type: object
@@ -2101,10 +2123,10 @@ components:
         download_url:
           type: string
           format: uri
-          description: プリサインド URL (S3 GetObject)。
+          description: 署名付きダウンロード URL（24 時間有効）。ホストは S3 または CloudFront。
         expires_in_seconds:
           type: integer
-          description: プリサインド URL の有効秒数。
+          description: 署名付きダウンロード URL の有効秒数。
         data_through:
           type: string
           format: date
@@ -2530,10 +2552,11 @@ components:
       description: |
         エラー応答。`detail` は 2 形式のいずれかで、クライアントは両方を扱う必要があります。
 
-        - **文字列** — SIMs / Stats / Exports、および Recharges のパラメータ検証エラー
-        - **オブジェクト** — Recharges のうちリチャージサービスへ委譲するエンドポイント
-          （残量取得・プラン一覧・予約の作成/一覧・即時リチャージ）。
-          中の `errorCode` / `message` はキャメルケースです
+        - **文字列** — SIMs / Stats / Exports、および全エンドポイント共通の `customer_code` の解決で返るエラー
+          （400: `customer_code` と `customer_id` の不一致・未指定 / 401: 認証コンテキストなし /
+          403: 認証スコープと不一致）
+        - **オブジェクト** — Recharges の上記以外のエラー（`iccid` / `sim_id` の未指定・不一致、
+          プラン詳細の 404 を含む）。中の `errorCode` / `message` はキャメルケースです
 
         API キーが不正・未指定の場合は API Gateway が応答するため、`detail` を持たない
         `{"message": "Forbidden"}` が返ります。
