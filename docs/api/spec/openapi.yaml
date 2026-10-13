@@ -62,13 +62,13 @@ paths:
         **表示対象**: Magic マイページの SIM 一覧と同じく、出荷手続き中または出荷済みの
         SIM・貸出SIM だけを返します。端末・レンタル端末や、プランが紐づいていない在庫は含まれません。
         `GET /v1/sims/count`・`/summary`・`/{sim_id}`・SIM の CSV エクスポートも同じ表示対象です。
+        一方、月次通信量（`/v1/stats/sims/monthly_usage`・`/v1/stats/sims/monthly_usage_by_sim`・
+        `/v1/stats/sims/{sim_id}/monthly_usage`）、通信明細（`/v1/stats/sims/{sim_id}/details`）、
+        月次利用実績 CSV（`/v1/exports/monthly_usage_by_sim`）は表示対象で絞りません（各 EP の説明を参照）。
 
         **母集団**: 既定（`include_terminated=false`）では `status <> 'terminated'` が対象です。
         在庫（`stock`）・停止（`inactive`）も含まれます。`include_terminated=true` では
         解約済みを含む全行が対象です。
-
-        ⚠️ この絞り込みは `status` の値に基づくため、**Salesforce 側で解約済みでも
-        `active` / `inactive` に分類された行は除外されません**（CASE の評価順が原因。#28）。
 
         **行数について**: 応答は `mc_sims` ビューの行で、SIM の枚数と一致しないことがあります。
         同一 SIM が複数行に増幅する既知の問題があるためです（本番実測で約 0.3%）。
@@ -326,6 +326,8 @@ paths:
 
         SIM 再発行が発生した月に Salesforce が作る**合計行（旧 + 新の合算行）は集計から除外**されます（旧SIM 行と新SIM 行はそれぞれ合算されます）。除外しないと再発行月は二重計上になります。詳細は `/v1/stats/sims/monthly_usage_by_sim` の `reissue_category` を参照してください。
 
+        集計の母集団は `GET /v1/sims` の表示対象ではなく、月次実績そのものです。表示対象外の SIM の実績も合算されるため、`GET /v1/sims` に出る SIM だけの月次通信量を足し上げても、この合計には届かないことがあります。SIM の顧客コードが付け替えられた場合の扱いは `/v1/stats/sims/{sim_id}/monthly_usage` の説明を参照してください（付け替え前の月の実績も、今の顧客コードで返ります）。
+
         該当データが無い場合は空配列 `[]` を返します（200）。
       operationId: ListMonthlyUsage
       parameters:
@@ -352,6 +354,8 @@ paths:
       summary: GetMonthlyUsageBySim — 月次通信量（指定月・SIM 別内訳）
       description: |
         指定月に**利用実績のある SIM のみ**の通信量内訳を返します（`sim_id` 昇順）。通信のない契約中 SIM は含まれません。
+
+        母集団は `GET /v1/sims` の表示対象ではなく、月次実績そのものです。表示対象外の SIM でも、その月に実績があれば含まれます。そのため、`GET /v1/sims` の件数や `GET /v1/sims/summary` とは一致しないことがあります。SIM の顧客コードが付け替えられた場合の扱いは `/v1/stats/sims/{sim_id}/monthly_usage` の説明を参照してください（付け替え前の月の実績も、今の顧客コードで返ります）。
 
         ⚠️ **本 EP は `合計行`（SIM 再発行月の 旧 + 新の合算行）を含みます**。単純合計すると再発行月は二重計上になるため、集計する場合は `reissue_category='total'` の行を除外するか、`new` / `old` を集計してください。
 
@@ -549,6 +553,10 @@ paths:
         ⚠️ **SIM 再発行が発生した月は、同一 `year_month` に複数行が返ります**（`旧SIM` / `新SIM` / `合計行` の 3 行のうち、その SIM の Inventory 配下にあたるもの）。**`合計行`（旧 + 新の合算行）を含むため、単純合計すると二重計上になります。** 各行の区別は `reissue_category` を参照してください。
 
         ⚠️ 集計 EP の `/v1/stats/sims/monthly_usage` は逆に `合計行` を除外しており、**本 EP が `合計行` を含む・集計 EP は除外する、という非対称は意図的**です（本 EP は生の実績を、集計 EP は請求根拠となる合算値を返すため）。
+
+        ⚠️ **本 EP は `GET /v1/sims` の表示対象で絞りません。** 表示対象外の SIM でも、指定した `customer_code` 配下に月次実績があれば返ります（`GET /v1/sims/{sim_id}` が 404 になる SIM でも、本 EP は 200 になることがあります）。実績が無い場合は従来どおり 404 です。全 SIM の月次（`/v1/stats/sims/monthly_usage`）・`monthly_usage_by_sim`・月次利用実績 CSV と同じ母集団にそろえるためで、SIM 別の累積・現プラン・日次の EP が表示対象外の SIM を 404 にするのとは非対称で、これは意図的です。
+
+        ⚠️ **月次実績の `customer_code` は、SIM が今紐づいている顧客コードです**（実績を記録した月の顧客コードではありません）。SIM が別の顧客コードへ付け替えられると、付け替え前の月の実績も新しい顧客コードで返り、古い顧客コードでは返らなくなります。全 SIM の月次（`/v1/stats/sims/monthly_usage`）・`monthly_usage_by_sim`・月次利用実績 CSV も同じ扱いです。日次（`/v1/stats/sims/{sim_id}/daily_usage`）は契約時点の顧客コードのまま遡及修正されないため、付け替えをまたぐ期間は両者で顧客コードの扱いが異なります。
       operationId: GetSimMonthlyUsage
       parameters:
         - name: sim_id
@@ -739,14 +747,23 @@ paths:
         - `days` / `from` / `to` クエリは受け付けません（400）。
         - 日次データは統計基盤側で生成するため `/v1/stats/` 配下に置いています。
 
-        ### CSV 列 (英字ヘッダ、date 降順)
+        ### CSV 列 (date 降順)
+
+        既定（`header_lang=en`）は英字のヘッダーです。
 
         ```
         date,sim_id,msisdn,uplink_bytes,downlink_bytes,total_bytes,is_confirmed
         ```
 
-        - `is_confirmed` は `true` / `false` 文字列です。
+        `header_lang=ja` を指定すると、ヘッダー行だけが日本語になります。
+
+        ```
+        日付,製造番号/ICCID,電話番号（国際表記）,上り（バイト）,下り（バイト）,合計（バイト）,確定
+        ```
+
+        - `is_confirmed` は `true` / `false` 文字列です（`header_lang=ja` でも同じ）。
         - `sim_id` を含めるのは CSV を単体で扱っても対象 SIM が特定できるようにするためです。
+        - 文字コードは UTF-8 です。`header_lang=ja` のときだけ、Excel で文字化けしないよう先頭に BOM を付けます。
       operationId: ExportSimDailyUsage
       parameters:
         - name: sim_id
@@ -781,6 +798,7 @@ paths:
             type: string
             enum: [csv]
             default: csv
+        - $ref: "#/components/parameters/HeaderLang"
         - $ref: "#/components/parameters/CustomerCode"
       responses:
         "200":
@@ -819,7 +837,10 @@ paths:
     get:
       tags: [Statistics]
       summary: GetSimUsageDetails — SIM CDR（通信明細）
-      description: 特定 SIM の通信明細（CDR）を取得します。直近 288 件（5 分粒度。連続してデータがある場合で約 24 時間分）のレコードが返却されます。
+      description: |
+        特定 SIM の通信明細（CDR）を取得します。直近 288 件（5 分粒度。連続してデータがある場合で約 24 時間分）のレコードが返却されます。
+
+        ⚠️ **本 EP は `GET /v1/sims` の表示対象で絞りません。** 表示対象外の SIM でも、指定した `customer_code` 配下に通信明細があれば返ります（`GET /v1/sims/{sim_id}` が 404 になる SIM でも、本 EP は 200 になることがあります）。通信明細が無い場合は従来どおり 404 です。
       operationId: GetSimUsageDetails
       parameters:
         - name: sim_id
@@ -959,6 +980,56 @@ paths:
 
         列名で読んでいる場合は、削除した 3 列を参照していなければ影響ありません。
         列を位置で読んでいる場合は追随してください。今後列を足す場合は原則として末尾に足します。
+
+        ### `header_lang=ja` の列名
+
+        `header_lang=ja` を指定すると、ヘッダー行だけが以下の日本語の列名になります
+        （列の数・並び・値は既定の `en` と同じです）。
+
+        | 列 | 日本語の列名 |
+        | --- | --- |
+        | `sim_id` | 製造番号/ICCID |
+        | `customer_code` | 顧客コード |
+        | `application_start_date` | 適用開始日 |
+        | `cancellation_mobile_core_date` | モバイルコア解約日 |
+        | `carrier_opening_date` | キャリア開通日 |
+        | `carrier_withdrawal_date` | 解約日 |
+        | `communication_generation` | 通信規格 |
+        | `dns_primary` | DNSプライマリ |
+        | `dns_secondary` | DNSセカンダリ |
+        | `extension_end_date` | 有効期限日 |
+        | `first_communicating_date` | 初回通信日 |
+        | `imsi` | IMSI |
+        | `ip_address` | IPアドレス |
+        | `ip_address_type` | IPアドレスタイプ |
+        | `line_category` | 回線種別 |
+        | `line_status_from_mc` | 回線状態（モバイルコア） |
+        | `line_stoped_date` | 回線停止日 |
+        | `lines_status` | 回線状態（在庫管理） |
+        | `linestarted_date` | 回線再開日 |
+        | `opening_date` | モバイルコア開通日 |
+        | `puk1` | PUK1 |
+        | `user_id` | ユーザID |
+        | `password` | パスワード |
+        | `msisdn` | 電話番号（国際表記） |
+        | `realm` | レルム |
+        | `service_category` | サービス種別 |
+        | `use_start_expiration_date` | 利用開始期限日 |
+        | `shipping_date` | 出荷日 |
+        | `apn` | APN |
+        | `active_plan_name` | プラン名 |
+        | `product_name` | 商品名 |
+        | `sim_category` | SIMサイズ |
+        | `product_name_id` | 商品マスタ |
+        | `status` | 回線状態 |
+        | `session_status` | セッション状態 |
+        | `session_created_at` | セッション開始日時 |
+        | `session_terminated_at` | セッション終了日時 |
+        | `lines_state_ss_for_mypage` | 回線状態（マイページ） |
+        | `product_code` | 商品コード |
+        | `quotation_application_number` | 見積・申込番号 |
+        | `tel` | 電話番号 |
+        | `sim_stock_status` | SIM状態 |
       operationId: CreateSimsExport
       parameters:
         - $ref: "#/components/parameters/CustomerCode"
@@ -969,6 +1040,7 @@ paths:
             type: string
             default: csv
             enum: [csv, json, jsonl]
+        - $ref: "#/components/parameters/HeaderLang"
         - name: async
           in: query
           description: "`true`: 非同期処理（即時レスポンス）、`false`: 同期処理（完了待ち）"
@@ -1020,21 +1092,24 @@ paths:
         - **非同期モード**（デフォルト）: 即座に署名付きダウンロード URL を返却し、バックグラウンドで処理します。
         - **同期モード**: 処理完了まで待機します。
 
-        CSV は 8 列固定・**英字ヘッダ**で以下の順に出力されます。
+        CSV は 8 列固定で以下の順に出力されます。ヘッダーは既定（`header_lang=en`）で英字、
+        `header_lang=ja` で日本語の列名になります（値は同じです）。
 
-        | 列 | 型 | 内容 |
-        | --- | --- | --- |
-        | `year_month` | string | `YYYYMM` |
-        | `sim_id` | string | 既存 SIM EP と同じ ID（ICCID とは限らない） |
-        | `msisdn` | string | 電話番号（国際表記。例 `814011001010`） |
-        | `tel` | string | 電話番号（国内表記。例 `04011001010`）。値が無い場合は空欄（本番実測で 12.4%） |
-        | `reissue_category` | string | 再発行区分。`new`（新 SIM）/ `old`（旧 SIM）/ `total`（合計行）。再発行の無い通常行は空 |
-        | `uplink_bytes` | integer | 上り通信量（生バイト、0 埋め） |
-        | `downlink_bytes` | integer | 下り通信量（生バイト、0 埋め） |
-        | `total_bytes` | integer | `uplink_bytes + downlink_bytes`（サーバ側計算） |
+        | 列 | `header_lang=ja` の列名 | 型 | 内容 |
+        | --- | --- | --- | --- |
+        | `year_month` | 年月 | string | `YYYYMM` |
+        | `sim_id` | 製造番号/ICCID | string | 既存 SIM EP と同じ ID（ICCID とは限らない） |
+        | `msisdn` | 電話番号（国際表記） | string | 電話番号（国際表記。例 `814011001010`） |
+        | `tel` | 電話番号 | string | 電話番号（国内表記。例 `04011001010`）。値が無い場合は空欄（本番実測で 12.4%） |
+        | `reissue_category` | 再発行区分 | string | 再発行区分。`new`（新 SIM）/ `old`（旧 SIM）/ `total`（合計行）。再発行の無い通常行は空 |
+        | `uplink_bytes` | 上り（バイト） | integer | 上り通信量（生バイト、0 埋め） |
+        | `downlink_bytes` | 下り（バイト） | integer | 下り通信量（生バイト、0 埋め） |
+        | `total_bytes` | 合計（バイト） | integer | `uplink_bytes + downlink_bytes`（サーバ側計算） |
 
         - 実績 0 件は 200 + ヘッダのみの CSV を返します（「その月に実績が無い」は正常な結果）。
         - 再発行月は「旧 SIM / 新 SIM / 合計」の 3 行が並びます。`exclude_total=true` を渡すと Salesforce が入れる合計行（`reissue_category='total'`）を除外できます。
+        - 母集団は `GET /v1/sims` の表示対象ではなく、月次実績そのものです。表示対象外の SIM でも、その月に実績があれば行が出ます。そのため、`GET /v1/sims` や SIM の CSV エクスポートとは SIM の集合が一致しないことがあります。
+        - 顧客コードの付け替え前の月の実績も、SIM の今の顧客コードで出力されます（`/v1/stats/sims/{sim_id}/monthly_usage` の説明を参照）。
       operationId: CreateMonthlyUsageBySimExport
       parameters:
         - $ref: "#/components/parameters/CustomerCode"
@@ -1061,6 +1136,7 @@ paths:
             type: string
             default: csv
             enum: [csv]
+        - $ref: "#/components/parameters/HeaderLang"
         - name: async
           in: query
           description: "`true`: 非同期処理（即時レスポンス）、`false`: 同期処理（完了待ち）"
@@ -1560,6 +1636,21 @@ components:
         type: string
         pattern: '^\d{9}$'
         example: "110139701"
+    HeaderLang:
+      name: header_lang
+      in: query
+      description: |
+        CSV のヘッダー行（列名）の言語。
+
+        - `en`（既定）: 英字の列名。これまでと同じ出力です
+        - `ja`: 日本語の列名。列ごとの対応は各エンドポイントの説明にあります
+
+        日本語になるのはヘッダー行だけです。値（日付・`true` / `false`・区分値など）と、
+        列の数・並びは `en` と同じです。
+      schema:
+        type: string
+        enum: [en, ja]
+        default: en
     PageSize:
       name: page_size
       in: query
@@ -1809,8 +1900,20 @@ components:
           type: string
           enum: [stock, ready, active, inactive, terminated, unknown]
           description: |
-            回線状態。Salesforce の状態フィールドから CASE 式で導出され、上から順に評価されます
-            （`stock` → `ready` → `active` → `inactive` → `terminated` → `unknown`）。
+            回線状態。Salesforce の状態フィールドから CASE 式で導出されます。次の順に評価し、
+            最初に当てはまった値になります。
+
+            1. `terminated`: `lines_status` が解約
+            2. `stock`: 在庫状態（API には含まれない項目）が在庫で、`shipping_date` が無い
+            3. `ready`: `lines_status` が開通で、`shipping_date` がある
+            4. `active`: `lines_status` と `line_status_from_mc` がどちらも開通で、`opening_date` がある
+               （`shipping_date` があれば 3. の `ready` が先に当たる）
+            5. `inactive`: `lines_status` が停止、または SS 側の回線状態（API には含まれない項目。
+               `lines_state_ss_for_mypage` とは別の項目）が停止中
+            6. `unknown`: 上記のいずれにも該当しない
+
+            一時停止の処理中（`lines_status` は停止、`line_status_from_mc` はまだ開通）の回線は
+            `inactive` になります（#126）。
 
             **`SimSummary` との対応**: `ready` / `active` / `terminated` / `unknown` は共通ですが、
             `stock` と `inactive` はサマリに出力されません。逆にサマリの `subscribed` は
@@ -1818,7 +1921,7 @@ components:
 
             ⚠️ **`active` の件数を稼働回線数として扱わないでください。** 評価順の都合で
             `ready` の条件が先に当たるため、実際に稼働している回線の大半が `ready` に分類されます
-            （本番実測: `active` は 200 万行中 42 行、うち 17 行は Salesforce 側で解約済み）。
+            （本番でも `active` はごく少数です）。
             この判定ロジックの見直しは #28 で扱います。
         session_status:
           type: string
@@ -1960,7 +2063,7 @@ components:
           description: 開通済みで出荷済み
         active:
           type: integer
-          description: 稼働中
+          description: '`status` が `active` の件数（条件は `Sim.status` を参照。稼働回線数ではない）'
         online:
           type: integer
           description: セッション接続中
