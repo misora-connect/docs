@@ -59,6 +59,10 @@ paths:
       description: |
         顧客に紐づく SIM のページネーション付き一覧を取得します。
 
+        **表示対象**: Magic マイページの SIM 一覧と同じく、出荷手続き中または出荷済みの
+        SIM・貸出SIM だけを返します。端末・レンタル端末や、プランが紐づいていない在庫は含まれません。
+        `GET /v1/sims/count`・`/summary`・`/{sim_id}`・SIM の CSV エクスポートも同じ表示対象です。
+
         **母集団**: 既定（`include_terminated=false`）では `status <> 'terminated'` が対象です。
         在庫（`stock`）・停止（`inactive`）も含まれます。`include_terminated=true` では
         解約済みを含む全行が対象です。
@@ -176,6 +180,9 @@ paths:
         返します（`SimDetail` スキーマ）。この 2 つは明細でのみ返り、一覧・CSV エクスポートには含まれません。
 
         SIM 一覧と共通のフィールドについては `Sim` スキーマを参照してください。
+
+        表示対象は `GET /v1/sims` と同じです。`GET /v1/sims` の表示対象外の在庫は、
+        ID を指定しても 404 になります。
       operationId: GetSim
       parameters:
         - name: sim_id
@@ -247,7 +254,7 @@ paths:
         一覧のフィルタ時件数表示や、CSV エクスポートへ誘導するかの判定に使用します。
 
         件数は `mc_sims` ビューの**行数**であり、SIM の枚数とは一致しません。
-        絞り込みの条件・意味論は `GET /v1/sims` と共通です。
+        表示対象・絞り込みの条件・意味論は `GET /v1/sims` と共通です。
       operationId: CountSims
       parameters:
         - $ref: "#/components/parameters/CustomerCode"
@@ -283,7 +290,7 @@ paths:
     get:
       tags: [SIM Management]
       summary: GetSimsSummary — SIM サマリー取得
-      description: 顧客に紐づく全 SIM の集計サマリー情報を取得します。
+      description: 顧客に紐づく SIM のうち、`GET /v1/sims` の表示対象の在庫の集計サマリー情報を取得します。
       operationId: GetSimsSummary
       parameters:
         - $ref: "#/components/parameters/CustomerCode"
@@ -501,6 +508,8 @@ paths:
         最新の Executed リチャージ予約の `usage_offset_bytes` を引いた
         値です。`usage_offset_bytes` が記録されていない場合は `null` を
         返します。
+
+        `GET /v1/sims` の表示対象外の SIMは 404 になります。
       operationId: GetSimCurrentPlanUsage
       parameters:
         - name: sim_id
@@ -587,7 +596,7 @@ paths:
         - **通信のない日も 0 バイトの行として返却**されるため、実績のある SIM なら常に `days` 件が返ります。
         - **期間を明示したい場合は `start_date` / `end_date`（`YYYY-MM-DD`, JST）を指定**します（`days` と同時指定は 400）。片方だけの指定は 400 です。`end_date` は集計終端の **JST 前日にクランプ**されるため、本日や未来日を指定してもエラーにならず、前日までの行が返ります。`start_date` は JST 前日以前で、かつ今日から 31 日以内の日付である必要があります。
         - `from` / `to` クエリは受け付けません（400）。命名はリポジトリ規約に合わせて `start_date` / `end_date` を使ってください。
-        - **404 になるのは、指定 `customer_code` 配下に当該 SIM の通信実績レコードが 1 件も存在しない場合**です。SIM 自体は存在しても一度も通信していなければ 404 になります。「SIM が存在しない」ことの判定には使えません。
+        - **404 になるのは、指定 `customer_code` 配下に当該 SIM の通信実績レコードが 1 件も存在しない場合**です。SIM 自体は存在しても一度も通信していなければ 404 になります。「SIM が存在しない」ことの判定には使えません。`GET /v1/sims` の表示対象外の SIMも 404 になります。
         - `data_through` は日次集計が確定している最終日、`checked_at` は集計を実行した時刻です。本 API の他の日時と同様に **UTC 表記（`...Z`）** で返ります。
 
         ### `is_confirmed` の意味と `in_bytes = 0` の解釈
@@ -721,6 +730,8 @@ paths:
           `end_date` は集計終端の JST 前日にクランプされます。詳細は同期 EP の description を参照。
         - **0 件でも 200 + ヘッダのみ CSV を返します**（同期 EP は 404）。ダウンロード URL が
           必ず返る運用にするため。仕様の非対称は意図的です。
+          ただし `GET /v1/sims` の表示対象外の SIMは、
+          同期 EP と同じく 404 になります。
         - `data_through` は応答 JSON に**1 度だけ**含めます（全行同値のため CSV 列に持たせません）。
           0 件の場合は `null` になります。
         - **時計ずれ検出は同期 EP と同じ**で、期待行数を下回ると **500** を返します。
@@ -844,6 +855,8 @@ paths:
       summary: GetSimCumulativeUsage — 累積通信量
       description: |
         特定 SIM の累積通信量を取得します。概ねリアルタイムで更新されます（最大 5 分のラグがあります）。
+
+        `GET /v1/sims` の表示対象外の SIMは 404 になります。
       operationId: GetSimCumulativeUsage
       parameters:
         - name: sim_id
@@ -1929,6 +1942,9 @@ components:
       type: object
       description: |
         顧客に紐づく SIM のステータス別集計。各件数は `mc_sims` の行数を数えたもの。
+        表示対象は `GET /v1/sims` と同じ（表示対象外の在庫は数えない）。
+        表示対象の在庫が 1 件も無い顧客では、空のオブジェクト `{}` を返す
+        （`customer_code`・各件数・`updated_at` のいずれのキーも含まない）。
       properties:
         customer_code:
           type: string
@@ -1961,7 +1977,7 @@ components:
           description: |
             集計元データ（`sf.inventory`）の最終更新時刻。当該顧客のレコードのうち
             Salesforce 上で最後に更新されたものの時刻を返す（同期パイプラインの実行時刻ではない）。
-            対象レコードが無い場合は null。
+            表示対象外の在庫（端末など）の更新も含む。対象レコードが無い場合は null。
 
     # ----- Statistics -----
     MonthlyUsage:
