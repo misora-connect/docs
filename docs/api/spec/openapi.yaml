@@ -116,6 +116,9 @@ paths:
             default: false
         - $ref: "#/components/parameters/SimIdPrefixFilter"
         - $ref: "#/components/parameters/MsisdnPrefixFilter"
+        - $ref: "#/components/parameters/ShippingDateFromFilter"
+        - $ref: "#/components/parameters/ShippingDateToFilter"
+        - $ref: "#/components/parameters/QuotationApplicationNumberFilter"
         - name: filter_nulls
           in: query
           description: |
@@ -270,6 +273,9 @@ paths:
             default: false
         - $ref: "#/components/parameters/SimIdPrefixFilter"
         - $ref: "#/components/parameters/MsisdnPrefixFilter"
+        - $ref: "#/components/parameters/ShippingDateFromFilter"
+        - $ref: "#/components/parameters/ShippingDateToFilter"
+        - $ref: "#/components/parameters/QuotationApplicationNumberFilter"
       responses:
         "200":
           description: 成功
@@ -1727,6 +1733,55 @@ components:
         type: string
         pattern: '^\+?[0-9()\- 　]+$'
         example: "070-1234-5678"
+    ShippingDateFromFilter:
+      name: shipping_date_from
+      in: query
+      description: |
+        出荷日（`shipping_date`）が**この日以降**（`shipping_date >= 値`、当日を含む）の
+        SIM に絞り込みます（#207）。
+
+        - 形式は `YYYY-MM-DD` のみ。basic 形式（`20260101`）・週日付（`2026-W01-1`）・
+          ゼロ埋めなし・空文字は **400**
+        - `shipping_date_to` より後の日付を指定すると **400**
+        - `shipping_date_to` と組で期間になりますが、**片方だけの指定も可能**です
+        - `shipping_date` が空の SIM は、この条件を指定した時点で対象外になります
+        - 他の絞り込み条件とは **AND** で結合します
+      schema:
+        type: string
+        format: date
+        example: "2026-01-01"
+    ShippingDateToFilter:
+      name: shipping_date_to
+      in: query
+      description: |
+        出荷日（`shipping_date`）が**この日以前**（`shipping_date <= 値`、当日を含む）の
+        SIM に絞り込みます（#207）。
+
+        - 形式は `YYYY-MM-DD` のみ。basic 形式・週日付・ゼロ埋めなし・空文字は **400**
+        - `shipping_date_from` より前の日付を指定すると **400**
+        - `shipping_date_from` と同じ日を指定すると、その 1 日だけに絞り込めます
+        - `shipping_date` が空の SIM は、この条件を指定した時点で対象外になります
+        - 他の絞り込み条件とは **AND** で結合します
+      schema:
+        type: string
+        format: date
+        example: "2026-03-31"
+    QuotationApplicationNumberFilter:
+      name: quotation_application_number
+      in: query
+      description: |
+        見積・申込番号（`quotation_application_number`）の**部分一致**で絞り込みます（#207）。
+        旧マイページのレポートの「含む」条件と同じです。
+
+        - **大小文字を区別しません**（`op-12` と `OP-12` は同じ結果）
+        - 入力の `%`・`_`・`\` は**そのままの文字**として扱います（ワイルドカードにはなりません）
+        - **前後の空白（全角を含む）は無視します**（` OP-12 ` と `OP-12` は同じ結果）
+        - 前後の空白を除いて 32 文字以内。空文字・空白だけ・32 文字超・制御文字を含む値は **400**
+        - 他の絞り込み条件とは **AND** で結合します
+      schema:
+        type: string
+        maxLength: 32
+        example: "OP-12345"
 
   schemas:
     # ----- SIM -----
