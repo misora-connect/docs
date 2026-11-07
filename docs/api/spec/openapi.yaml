@@ -167,6 +167,7 @@ paths:
                   status: "ready"
                   session_status: "online"
                   session_created_at: "2026-08-18T22:54:11Z"
+                  note: "不良SIMのため交換対応済み"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -179,8 +180,9 @@ paths:
       description: |
         特定の SIM の詳細情報を取得します。
 
-        `GET /v1/sims` の全フィールドに加えて、備考 `note` と一時停止フラグ `lines_temporary_stop` を
-        返します（`SimDetail` スキーマ）。この 2 つは明細でのみ返り、一覧・CSV エクスポートには含まれません。
+        `GET /v1/sims` の全フィールドに加えて、一時停止フラグ `lines_temporary_stop` を
+        返します（`SimDetail` スキーマ）。`lines_temporary_stop` は明細でのみ返り、一覧・CSV エクスポートには含まれません。
+        備考 `note` は一覧と同じ値を返します（`Sim` スキーマ）。
 
         SIM 一覧と共通のフィールドについては `Sim` スキーマを参照してください。
 
@@ -973,6 +975,7 @@ paths:
         `Sim` スキーマのうち `ipv6_address` / `ipv6_address_dns_primary` /
         `ipv6_address_dns_secondary` の 3 列は **CSV には出力しません**（実データで常に空のため）。
         `GET /v1/sims` の応答には引き続き含まれます。
+        備考 `note`（自由記述）も CSV には出力しません。`GET /v1/sims` と `GET /v1/sims/{sim_id}` の応答で取得してください。
 
         ⚠️ **2026-09 の更新で列構成が変わりました**（37 列 → 41 列）。
         - ipv6 系 3 列を削除（旧 CSV の 15〜17 列目）。**それより後ろの列は位置が 3 つ前にずれます**
@@ -1175,7 +1178,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  # ===== Recharges =====
   /recharges/sims:
     get:
       tags: [Recharges]
@@ -1788,10 +1790,11 @@ components:
     Sim:
       type: object
       description: |
-        `GET /v1/sims` の応答。`mc_sims` ビューの 45 列に対応する
-        （ビューは 47 列で、うち `activation_code` / `puk2` の 2 列は API・CSV とも出力しない。
-        `puk1` / `user_id` / `password` は 2026-09 の更新で出力するようになりました）。
-        明細 `GET /v1/sims/{sim_id}` は、これに `note` と `lines_temporary_stop` を足した `SimDetail` を返す。
+        `GET /v1/sims` の応答。`mc_sims` ビューの 46 列に対応する
+        （ビューは 48 列で、うち `activation_code` / `puk2` の 2 列は API・CSV とも出力しない。
+        `puk1` / `user_id` / `password` は 2026-09 の更新で出力するようになりました。
+        備考 `note` は以前は明細だけで返していましたが、一覧でも返るようになりました）。
+        明細 `GET /v1/sims/{sim_id}` は、これに `lines_temporary_stop` を足した `SimDetail` を返す。
 
         `filter_nulls=true`（既定）のとき、値が null のフィールドは **キーごと応答から消える**
         （`null` として返るのではない）。`nullable: true` が効くのは `filter_nulls=false` のとき。
@@ -2050,30 +2053,31 @@ components:
 
             本番実測（2026-09-16）で 0.14% が `null`（空文字はゼロ件）。
             `filter_nulls=true`（既定）ではキーごと落ちます。
+        note:
+          type: string
+          nullable: true
+          maxLength: 255
+          example: "不良SIMのため交換対応済み"
+          description: |
+            備考（Salesforce `Inventory__c.Remarks3__c`）。単一の上書き型メモで、履歴・作成者・更新時刻は持たない。
+
+            備考が無い SIM では `filter_nulls=true`（既定）なら **キーごと落ち**、
+            `filter_nulls=false` なら `null` が返る。どちらも「備考なし」を意味し、
+            クライアントは両者を区別しない。**空文字は返らない**（空は `null` に寄せる）。
+            他のフィールドは空文字が返ることがあるが、`note` だけは返らない。
+
+            一覧 `GET /v1/sims` と明細 `GET /v1/sims/{sim_id}` で同じ値を返す
+            （以前は明細だけで返していました）。CSV エクスポートには含まれない。
 
     SimDetail:
       description: |
-        `GET /v1/sims/{sim_id}` の応答。`Sim` の全フィールドに加えて `note` と
-        `lines_temporary_stop` を返す。
+        `GET /v1/sims/{sim_id}` の応答。`Sim` の全フィールドに加えて `lines_temporary_stop` を返す。
 
-        `note` は明細でのみ返る。`GET /v1/sims`（一覧）と CSV エクスポートには
-        含まれない（#57）。自由記述の備考を顧客向け CSV に混ぜないため、
-        明細専用のビュー `mc_sim_detail` に分けている。
+        備考 `note` も以前は明細だけで返していたが、今は `Sim` に含まれ一覧でも返る。
       allOf:
         - $ref: "#/components/schemas/Sim"
         - type: object
           properties:
-            note:
-              type: string
-              nullable: true
-              maxLength: 255
-              example: "不良SIMのため交換対応済み"
-              description: |
-                備考。単一の上書き型メモで、履歴・作成者・更新時刻は持たない。
-
-                備考が無い SIM では `filter_nulls=true`（既定）なら **キーごと落ち**、
-                `filter_nulls=false` なら `null` が返る。どちらも「備考なし」を意味し、
-                クライアントは両者を区別しない。**空文字は返らない**（空は `null` に寄せる）。
             lines_temporary_stop:
               type: boolean
               nullable: true
